@@ -1,0 +1,1 @@
+﻿$shared = get-remotemailbox -OnPremisesOrganizationalUnit "OU=APAC,OU=Shared Accounts,OU=Special Accounts,OU=Users,OU=Enterprise,DC=allegisgroup,DC=com" | set-remotemailbox –EmailAddressPolicyEnabled:$true
