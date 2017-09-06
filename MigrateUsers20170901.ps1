@@ -308,7 +308,7 @@ Function ChangeForwarding ($TargetUser, $ForwardingAddress, $AGSEmail)
         {
             Set-Mailbox -identity $TargetIdentity -ForwardingSmtpAddress  $Null
         }
-        $Line = "Sucsess: $TargetUser  O365 forwarding has been set to $ForwardingAddress."
+        $Line = "Sucsess: $TargetIdentity  O365 forwarding has been set to $ForwardingAddress."
         WriteLine $Line
         If ($T2Conact)
         {
@@ -317,7 +317,7 @@ Function ChangeForwarding ($TargetUser, $ForwardingAddress, $AGSEmail)
     }
     Else 
     {
-        $Line = "Error: $TargetUser  Error O365  forwarding has Not been set to $Forwardingaddress."
+        $Line = "Error: $TargetIdentity  Error O365  forwarding has Not been set to $Forwardingaddress."
         WriteLine $Line
     }
     $T2Conact = $Null
