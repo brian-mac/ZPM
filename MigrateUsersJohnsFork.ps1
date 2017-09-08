@@ -57,6 +57,7 @@ Function CloseGracefully()
 }
 Function ConnectToO365 ()
 {
+    $usercredential = Get-Credential -UserName "jkontoni.admin@allegisgroup.com" -Message "Please enter:" 
     $PSsessions = Get-PSSession
     foreach ($PsSession in $PSsessions)
     {
@@ -87,6 +88,7 @@ Function ConnectToO365 ()
 
 Function ConnectToExch ()
 {
+    $usercredential = Get-Credential -UserName "john.kontonis@allegisgroup.com" -Message "Please enter:" 
     $PSsessions = Get-PSSession
     foreach ($PsSession in $PSsessions)
     {
@@ -588,7 +590,6 @@ WriteAsia $AsiaLog
 #Set Target Group
 $Gaap = "APAC-Migrated-Gapps"
 
-$usercredential = Get-Credential -Message "Please enter user name and password for allegisgroup.com"
 ConnectToExch
 ConnectToO365
 CheckandImportModule "ActiveDirectory" 
