@@ -59,7 +59,7 @@ foreach ($MigratedUser in $SMigratedUsersT2)
     $TMailBox = get-mailbox $TargetUser 
     if ( $TMailBox)
     {
-        $Line = $TargetUser + "," + $TMailBox.ForwardingSmtpAddress + "," +  $TmaiMailBoxlbox.ForwardingAddress
+        $Line = $TargetUser + "," + $TMailBox.ForwardingSmtpAddress + "," +  $TMailBox.ForwardingAddress
         $Stream.writeline( $line )
         Write-Host $Line
     }
@@ -69,6 +69,6 @@ foreach ($MigratedUser in $SMigratedUsersT2)
         $Stream.writeline( $line )
         Write-Host $Line -ForegroundColor Red
     }
-    $TmaiMailBoxlbox = $null
+    $TMailBox = $null
 }
 CloseGracefully
