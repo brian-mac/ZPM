@@ -1,3 +1,10 @@
+[CmdletBinding (DefaultParameterSetName="Set 2")]
+param (
+    [Parameter(Parametersetname = "Set 1")][String]$Inputfile
+)
+# Check_forwarding Johns Fork
+# Version 2.0.0 20170914
+
 Function CloseGracefully()
 {
     # Close all file streams, files and sessions.
@@ -5,16 +12,16 @@ Function CloseGracefully()
     Write-Host $Date  +  " PSSession and log file closed."
     $Stream.Close()
     $fs.Close()
-
     
     # Close PS Sessions
-   # Get-PSSession | Remove-PSSession
+    Get-PSSession | Remove-PSSession
     $error.clear()
     Exit
 }
 
 Function ConnectToO365 ()
 {
+    $usercredential = Get-Credential -UserName "jkontoni.admin@allegisgroup.com" -Message "Please enter:" 
     $PSsessions = Get-PSSession
     foreach ($PsSession in $PSsessions)
     {
@@ -36,6 +43,10 @@ Function ConnectToO365 ()
            
         } $session = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $UserCredential -Authentication Basic -AllowRedirection
         Import-PSSession $session  
+        If (!$session)
+        {
+            CloseGracefully
+        }
     }
 }
 
@@ -51,12 +62,12 @@ $Line = "TargetUser,ForwardingSmtpAddress,ForwardingAddress"
 $Stream.writeline( $line )
 ConnectToO365
 
-$Inputfile = "C:\temp\checkforwarding.csv"
+#$Inputfile = "C:\temp\checkforwarding.csv"
 $SMigratedUsersT2 = import-csv -Path $Inputfile
 foreach ($MigratedUser in $SMigratedUsersT2)
 {
-    $TargetUser = $MigratedUser.Allegisemail
-    $TMailBox = get-mailbox $TargetUser 
+    $TargetUser = $MigratedUser.Allegisemail 
+    $TMailBox = get-mailbox $TargetUser -errorAction silentlycontinue
     if ( $TMailBox)
     {
         $Line = $TargetUser + "," + $TMailBox.ForwardingSmtpAddress + "," +  $TMailBox.ForwardingAddress
@@ -65,7 +76,7 @@ foreach ($MigratedUser in $SMigratedUsersT2)
     }
     else
     {
-        $Line = $TargetUser + " Mailbox colud not be found"
+        $Line = $TargetUser + " Mailbox could not be found"
         $Stream.writeline( $line )
         Write-Host $Line -ForegroundColor Red
     }

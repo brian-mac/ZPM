@@ -10,7 +10,7 @@
 *Creates an output of all Asia users C:\temp\AsiaAddToGApp.csv, this  file is used as an input for a script that runs on the Talent2Asia.com domain.
 
 .Description
-Version 4.5.0 20170901 (UAT Tested)
+Version 4.5.3 20170912 (Johns Fork)
 The script can either create act on a single user at a time or multiple users using a CSV file.
 The script has two input parameters: Target User email address and forwarding email address value.
 
@@ -231,8 +231,6 @@ function AddSigniture ($targetUser,$AGSEmail)
     AddToDlist $Targetemail $SignitureGroup 
     $GroupSuffix  = $null
 }
-
-
 
 
 function CheckandImportModule ($ModuleName)
@@ -570,12 +568,16 @@ Function ProcessUser($MigratedUser, $ForwardingAddress, $AGSEmail)
 
 # Main Body
 # Create Log file stream
+$date = get-date -Format d
+$date = $date.split("/")
+$date = $date.item(2) + $date.item(1) + $date.item(0)
+$Temp_Asia_log = "C:\temp\AsiaAddToGApp$date.csv"
 $mode       = [System.IO.FileMode]::Append
 $ModeAsia   = [System.IO.FileMode]::Create
 $access     = [System.IO.FileAccess]::Write
 $sharing    = [IO.FileShare]::Read
 $LogPath    = [System.IO.Path]::Combine("C:\temp\OMigratedT2Tasks.txt")
-$AsiaLog    = [System.IO.Path]::Combine("C:\temp\AsiaAddToGApp.csv")
+$AsiaLog    = [System.IO.Path]::Combine($Temp_Asia_log)
 
 # create the FileStream and StreamWriter objects
 $fs = New-Object IO.FileStream($LogPath, $mode, $access, $sharing)
