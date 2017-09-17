@@ -1,3 +1,25 @@
+Function CloseGracefully()
+{
+    # Close all file streams, files and sessions.
+    $Stream.writeline( $Date +  " PSSession and log file closed.")
+    Write-Host $Date  +  " PSSession and log file closed."
+    $Stream.Close()
+    $fs.Close()
+    $StreamAsia.close()
+    $fsAsia.close()
+    
+    # Close PS Sessions
+    # Get-PSSession | Remove-PSSession
+    $error.clear()
+    Exit
+}
+function WriteLine ($LineTxt) 
+{
+    $Date = get-date -Format G
+    $Date = $Date + "    : "  
+    $LineTxt = $date + $LineTxt  
+    $Stream.writeline( $LineTxt )
+}
    
 Function UnpackDelgates ($Delegates)   
 {
@@ -8,17 +30,19 @@ Function UnpackDelgates ($Delegates)
         If ($del.Contains("talent2.com") )
         {
             # We need to find the coresponding O365 account
-            $TargDel = get-mailbox | Where-Object {$_.ForwardingSmtpAddress -eq $Del} -ErrorAction SilentlyContinue
+            $TargDel = get-mailbox -Filter "$_.Forwardingsmtpaddress -eq '$del'" -ErrorAction SilentlyContinue
             If ($TargDel)
             {
                 #Found a mailbox with the T2 as a forwarding value
-                 $ValidDelgates.add($TargetDel.ForwardingSmtpAddress)
+                $ValDel = ($TargDel.ForwardingSmtpAddress).split(":")  
+                $ValDel = $ValDel.Item(1) 
+                 $ValidDelgates.add($ValDel)
             }
             else
             {
                 #Lets try and find a recipient (Ok a contact really) with an email address of Talent2 
                 # Ok this firmly makes the assumption we are in T2 and AG not any mail enviroment
-                $TargRecp = Get-Recipient | Where-Object {$_.PrimarySmtpAddress -eq $Del} -ErrorAction SilentlyContinue
+                $TargRecp = Get-Recipient -Filter "$_.PrimarySmtpAddress -eq '$Del'" -ErrorAction SilentlyContinue
                 if ($TargRecp)
                 {
                     # Found Something.
@@ -26,17 +50,24 @@ Function UnpackDelgates ($Delegates)
                     {
                         #Yep it is a contact, Now we have to find the account this is a forwarder for
                         $ContactID = $TargRecp.id 
-                        $TargDel = get-mailbox | Where-Object {$_.ForwardinAddress -eq $ContactID} -ErrorAction SilentlyContinue
+                        $TargDel = get-mailbox -Filter "$_.ForwardingAddress -eq '$ContactId'" -ErrorAction SilentlyContinue
                         If ($TargDel)
                         {
-                            $ValidDelgates.add($TargDel.PrimarySmtpAddress)
+                            $ValCon = ($TargDel.PrimarySmtpAddress).split(":")
+                            $ValCon = $ValCon.item(1)
+                            $ValidDelgates.add($ValCon)
                         }
                         else 
                         {
                             $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del " 
-                            # Write-Line $Line
+                            WriteLine $Line
                         }
                     } 
+                }
+                else
+                {
+                    $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del " 
+                    WriteLine $Line    
                 }
             }
         } 
@@ -51,7 +82,7 @@ Function UnpackDelgates ($Delegates)
             else
             {
                 $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del " 
-                # Write-Line $Line
+                WriteLine $Line
             }
         }
     }
@@ -80,7 +111,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
             else
             {
                 $Line = "Error: Could not find the Mailbox $Target, unexpected this was"
-                #WriteLine $Line    
+                WriteLine $Line    
             }
         }
     }
@@ -99,7 +130,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
             else
             {
                 $Line = "Error: Could not find the Mailbox $Target, unexpected this was"
-                #WriteLine $Line    
+                WriteLine $Line    
             }  
         }
     }
@@ -111,7 +142,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
         # Loop through each delegate
         foreach ($IndividualDel in $ValidatedDeliagtes)
         {
-            if ($IndividualDel)
+            if ($IndividualDel.contains("@"))
             {
                 $MailboxID = $Target.id
                 try
@@ -123,7 +154,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
                 {
                     $Line ="Error: $IndividualDel count NOT be added to $Target"
                 }
-                #writeline $Line
+                writeline $Line
                 if ($Target.IsShared)
                 {
                     try
@@ -135,7 +166,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
                     {
                         $Line ="Error: SendAs not added for $IndividualDel to $Target"
                     }
-                    #Writeline $Line
+                    Writeline $Line
                     try
                     {
                         Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox $Using:MailboxId  -MessageCopyForSentAsEnabled $True} > $Null
@@ -145,7 +176,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
                     {
                         $Line ="Error: MessageCopyForSentAsEnabled not set for $Target"
                     }
-                    #Writeline $Line                
+                    Writeline $Line                
                 }
             }
         }
@@ -184,7 +215,33 @@ Function ConnectToO365 ()
     }
 }
 
-#ConnectToO365
+
+# Main Body
+ConnectToO365
+# Create Log file stream
+
+$date = get-date -Format d
+$date = $date.split("/")
+$date = $date.item(2) + $date.item(1) + $date.item(0)
+$Temp_Asia_log = "C:\temp\AsiaAddToGApp$date.csv"
+$mode       = [System.IO.FileMode]::Append
+$ModeAsia   = [System.IO.FileMode]::Create
+$access     = [System.IO.FileAccess]::Write
+$sharing    = [IO.FileShare]::Read
+$LogPath    = [System.IO.Path]::Combine("C:\temp\OMigratedT2Tasks.txt")
+$AsiaLog    = [System.IO.Path]::Combine($Temp_Asia_log)
+
+# create the FileStream and StreamWriter objects
+$fs = New-Object IO.FileStream($LogPath, $mode, $access, $sharing)
+$Stream = New-Object System.IO.StreamWriter($fs)
+
+#$fsAsia = New-Object IO.FileStream($AsiaLog, $ModeAsia, $access, $sharing)
+#$StreamAsia = New-Object System.IO.StreamWriter($fsAsia)
+#Write headers for AsiaAddToGapp.csv
+#$AsiaLog = "EmailAddress,SamAccountName,GoogleGroup"
+#WriteAsia $AsiaLog
+
+
 
 $Hash=@{}
 $DependFile ="C:\Temp\dependancyreport.csv"
@@ -194,4 +251,5 @@ foreach ($dependecy in $Depends)
     $Hash.Add($dependecy.email, $dependecy.'Inbox Delegated To')
 
 }
-AddDeligations "aaron.clancy@talent2.com" "Aaron.Clancy@AllegisGlobalSolutions.com"
+# AddDeligations "aaron.clancy@talent2.com" "Aaron.Clancy@AllegisGlobalSolutions.com"
+AddDeligations "ss.accounts@allegisglobalsolutions.com" $null
