@@ -36,6 +36,7 @@ To call this script in windows 10 to migrate a user DL: powershell .\MigrateUser
 [CmdletBinding (DefaultParameterSetName="Set 2")]
 param (
     [Parameter(Parametersetname = "Set 1")][String]$Inputfile , 
+    [Parameter(ParameterSetName = "Set 1")][string]$DependFile,
     [Parameter(Mandatory=$True,HelpMessage="Please enter Email Address",Parametersetname = "Set 2" )][string] $Email,
     [Parameter(Mandatory=$True,HelpMessage="Please enter Forwarding Email Address",Parametersetname = "Set 2" )][string] $O365ForwardingAddress,
     [Parameter(Mandatory=$True,HelpMessage="Please enter AGS Email Address",Parametersetname = "Set 2" )][string] $AGSEmail
@@ -311,12 +312,14 @@ Function ChangeForwarding ($TargetUser, $ForwardingAddress, $AGSEmail)
         if($ForwardingAddress -ne "" -and $ForwardingAddress -ne "None")
         {
             Set-Mailbox -identity $TargetIdentity -ForwardingSmtpAddress  $ForwardingAddress
+            $Line = "Sucsess: $TargetIdentity  O365 forwarding has been set to $ForwardingAddress."
+            WriteLine $Line
         }
         Else
         {
             Set-Mailbox -identity $TargetIdentity -ForwardingSmtpAddress  $Null
         }
-        $Line = "Sucsess: $TargetIdentity  O365 forwarding has been set to $ForwardingAddress."
+        $Line = "Sucsess: $TargetIdentity  O365 forwarding has been set to Null."
         WriteLine $Line
         If ($T2Conact)
         {
@@ -482,10 +485,29 @@ Function ConvertUser($TargetUser)
     $Tmail = $Null
     Return $ConvertedUser
    }
+Function AddDeligations ($GoogleUPN,$O365Specific)
+{
+    #Check to see if current mailbox has a dependcey.
+    
+    If ($O365Specific)
+    {
+        # This means there will be a discrepencey between O365 account and GoogleUPN.
+        # Check for dependecies using Google UPN.
+        If ($hash[$GoogleUPN])
+        {
+            # Mailbox delegation found, however we need to use O365 specific value to bind to O365 mailbox
+            $Target = get-mailbox -identity $O365Specific
+            $HashValue = $Hash[$GoogleUPN]
+            
+        }
+    }
+   
+}
 
 Function ProcessUser($MigratedUser, $ForwardingAddress, $AGSEmail)
 {
-    #get-aduser  find any gaaps groups, removegapps them,   add the right gaap group
+    # Check and Modify Talent2.corp objects and properties
+    # Check there are not multiple AD Objects with this smtp address.
     Try 
     {
         $UserEmail = $MigratedUser
@@ -559,8 +581,10 @@ Function ProcessUser($MigratedUser, $ForwardingAddress, $AGSEmail)
             WriteLine $Line
         }
      }       
+    # Call functions for O365 and Exchange Online Objects and properties.
     ChangeForwarding $TargetUser $ForwardingAddress $AGSEmail
     AddSigniture $TargetUser $AGSEmail
+    AddDeligations $TargetUser $AGSEmail
 
     $AGSEmail = $null
     $ForwardingAddress = $null
@@ -597,6 +621,13 @@ ConnectToO365
 CheckandImportModule "ActiveDirectory" 
 #Test the inputfile
 $Inputfile = "C:\temp\test.csv"
+$DependFile ="C:\temp\dependacyreport.csv"
+# Load dependcey file as a has table for quick searching.
+
+$Hash=@{}
+$hash =import-csv -Path $DependFile
+
+
 if ($inputfile.Length -ne 0)
 {
     $SMigratedUsersT2 = import-csv -Path $Inputfile

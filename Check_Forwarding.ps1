@@ -21,7 +21,7 @@ Function CloseGracefully()
 
 Function ConnectToO365 ()
 {
-    $usercredential = Get-Credential -UserName "jkontoni.admin@allegisgroup.com" -Message "Please enter:" 
+    $usercredential = Get-Credential # -UserName "jkontoni.admin@allegisgroup.com" -Message "Please enter:" 
     $PSsessions = Get-PSSession
     foreach ($PsSession in $PSsessions)
     {
@@ -62,7 +62,7 @@ $Line = "TargetUser,ForwardingSmtpAddress,ForwardingAddress"
 $Stream.writeline( $line )
 ConnectToO365
 
-#$Inputfile = "C:\temp\checkforwarding.csv"
+$Inputfile = "C:\temp\checkforwarding.csv"
 $SMigratedUsersT2 = import-csv -Path $Inputfile
 foreach ($MigratedUser in $SMigratedUsersT2)
 {

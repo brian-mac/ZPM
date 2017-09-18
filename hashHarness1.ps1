@@ -34,9 +34,7 @@ Function UnpackDelgates ($Delegates)
             If ($TargDel)
             {
                 #Found a mailbox with the T2 as a forwarding value
-                $ValDel = ($TargDel.ForwardingSmtpAddress).split(":")  
-                $ValDel = $ValDel.Item(1) 
-                 $ValidDelgates.add($ValDel)
+                $ValidDelgates.add($TargDel.PrimarySmtpAddress)
             }
             else
             {
@@ -49,13 +47,11 @@ Function UnpackDelgates ($Delegates)
                     If ($TargRecp.RecipientType -eq "MailContact")
                     {
                         #Yep it is a contact, Now we have to find the account this is a forwarder for
-                        $ContactID = $TargRecp.id 
+                        $ContactID = $TargRecp.DistinguishedName
                         $TargDel = get-mailbox -Filter "$_.ForwardingAddress -eq '$ContactId'" -ErrorAction SilentlyContinue
                         If ($TargDel)
                         {
-                            $ValCon = ($TargDel.PrimarySmtpAddress).split(":")
-                            $ValCon = $ValCon.item(1)
-                            $ValidDelgates.add($ValCon)
+                           $ValidDelgates.add($TargDel.PrimarySmtpAddress)
                         }
                         else 
                         {
@@ -102,6 +98,8 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
         {
             # Mailbox delegation found, however we need to use O365 specific value to bind to O365 mailbox
             #Check mailbox existis 
+            $Line = "Checking:  Google delgation found for $GoogleUPN"
+            WriteLine $Line
             $Target = get-mailbox -identity $O365Specific -ErrorAction SilentlyContinue
             if ($Target)
             {
@@ -121,6 +119,8 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
         {
             # Mailbox delegation found
             #Check mailbox existis 
+            $Line = "Checking:  Google Delgation Found for $GoogleUPN"
+            WriteLine $Line
             $Target = get-mailbox -identity $GoogleUPN -ErrorAction SilentlyContinue    
             if ($Target)
             {
@@ -129,7 +129,8 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
             }
             else
             {
-                $Line = "Error: Could not find the Mailbox $Target, unexpected this was"
+                $TempName = $Target.PrimarySmtpAddress
+                $Line = "Error: Could not find the Mailbox $TempName, unexpected this was"
                 WriteLine $Line    
             }  
         }
@@ -139,9 +140,13 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
     {
         #Create A session specific for the invoke commands
         $Invsession = Get-PSSession -InstanceId (Get-OrganizationConfig).RunspaceId.Guid
+        $TargName = $Target.name
+        $Line = "Checking:  Valid delgates found for $TargName "
+        WriteLine
         # Loop through each delegate
         foreach ($IndividualDel in $ValidatedDeliagtes)
         {
+            $IndividualDel = ($IndividualDel).tostring()
             if ($IndividualDel.contains("@"))
             {
                 $MailboxID = $Target.id
@@ -159,7 +164,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
                 {
                     try
                     {
-                        Invoke-Command -Session $Invsession -ScriptBlock {Add-RecipientPermission -identity $Using:MailboxID  -AccessRights SendAs -Trustee $Using:IndividualDel} > $Null
+                        Invoke-Command -Session $Invsession -ScriptBlock {Add-RecipientPermission -identity $Using:MailboxID  -AccessRights SendAs -Trustee $Using:IndividualDel -Confirm:$false} > $Null
                         $Line = "Sucsess: Sendas added for $IndividualDel to $Target"
                     }
                     Catch 
@@ -182,6 +187,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
         }
     }
  $DelgateFlag = $false
+ Remove-PSSession -Session $Invsession
 }
 
 Function ConnectToO365 ()
@@ -244,7 +250,7 @@ $Stream = New-Object System.IO.StreamWriter($fs)
 
 
 $Hash=@{}
-$DependFile ="C:\Temp\dependancyreport.csv"
+$DependFile ="C:\Temp\dependacyreport.csv"
 $Depends =import-csv -Path $DependFile
 foreach ($dependecy in $Depends)
 {
