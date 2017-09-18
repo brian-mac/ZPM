@@ -85,6 +85,8 @@ Function ConnectToO365 ()
             CloseGracefully
         }
     }
+      #Create A session specific for the invoke commands
+      $Global:Invsession = Get-PSSession -Credential $usercredential -InstanceId (Get-OrganizationConfig).RunspaceId.Guid
 }
 
 Function ConnectToExch ()
@@ -484,7 +486,72 @@ Function ConvertUser($TargetUser)
     $IPphone = $Null
     $Tmail = $Null
     Return $ConvertedUser
-   }
+}
+Function UnpackDelgates ($Delegates)   
+{
+    $ValidDelgates = New-Object System.Collections.ArrayList
+    $delegates = $delegates.split("|")
+    foreach ($Del in $delegates)
+    {
+        If ($del.Contains("talent2.com") )
+        {
+            # We need to find the coresponding O365 account
+            $TargDel = get-mailbox -Filter "$_.Forwardingsmtpaddress -eq '$del'" -ErrorAction SilentlyContinue
+            If ($TargDel)
+            {
+                #Found a mailbox with the T2 as a forwarding value
+                $ValidDelgates.add($TargDel.PrimarySmtpAddress)
+            }
+            else
+            {
+                #Lets try and find a recipient (Ok a contact really) with an email address of Talent2 
+                # Ok this firmly makes the assumption we are in T2 and AG not any mail enviroment
+                $TargRecp = Get-Recipient -Filter "$_.PrimarySmtpAddress -eq '$Del'" -ErrorAction SilentlyContinue
+                if ($TargRecp)
+                {
+                    # Found Something.
+                    If ($TargRecp.RecipientType -eq "MailContact")
+                    {
+                        #Yep it is a contact, Now we have to find the account this is a forwarder for
+                        $ContactID = $TargRecp.DistinguishedName
+                        $TargDel = get-mailbox -Filter "$_.ForwardingAddress -eq '$ContactId'" -ErrorAction SilentlyContinue
+                        If ($TargDel)
+                        {
+                           $ValidDelgates.add($TargDel.PrimarySmtpAddress)
+                        }
+                        else 
+                        {
+                            $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del " 
+                            WriteLine $Line
+                        }
+                    } 
+                }
+                else
+                {
+                    $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del " 
+                    WriteLine $Line    
+                }
+            }
+        } 
+        Else
+        {
+            # Check delgate exists with this (Branded) smtp address.
+            $TargDel = get-mailbox -Identity $del -ErrorAction SilentlyContinue
+            if ($TargDel)
+            {
+                 $ValidDelgates.add($del) 
+            } 
+            else
+            {
+                $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del " 
+                WriteLine $Line
+            }
+        }
+    }
+    Return $ValidDelgates 
+    $ValidDelgates =$null
+}
+
 Function AddDeligations ($GoogleUPN,$O365Specific)
 {
     #Check to see if current mailbox has a dependcey.
@@ -496,14 +563,97 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
         If ($hash[$GoogleUPN])
         {
             # Mailbox delegation found, however we need to use O365 specific value to bind to O365 mailbox
-            $Target = get-mailbox -identity $O365Specific
-            $HashValue = $Hash[$GoogleUPN]
-            
+            #Check mailbox existis 
+            $Line = "Checking:  Google delgation found for $GoogleUPN"
+            WriteLine $Line
+            $Target = get-mailbox -identity $O365Specific -ErrorAction SilentlyContinue
+            if ($Target)
+            {
+               $ValidatedDeliagtes = UnpackDelgates $Hash[$GoogleUPN]
+               $DelgateFlag = $true
+            }
+            else
+            {
+                $Line = "Error: Could not find the Mailbox $Target, unexpected this was"
+                WriteLine $Line    
+            }
         }
     }
-   
+    else
+    {
+        If ($hash[$GoogleUPN])
+        {
+            # Mailbox delegation found
+            #Check mailbox existis 
+            $Line = "Checking:  Google Delgation Found for $GoogleUPN"
+            WriteLine $Line
+            $Target = get-mailbox -identity $GoogleUPN -ErrorAction SilentlyContinue    
+            if ($Target)
+            {
+                $ValidatedDeliagtes = UnpackDelgates $Hash[$GoogleUPN]
+                $DelgateFlag = $true
+            }
+            else
+            {
+                $TempName = $Target.PrimarySmtpAddress
+                $Line = "Error: Could not find the Mailbox $TempName, unexpected this was"
+                WriteLine $Line    
+            }  
+        }
+    }
+    # add permissions , check type of mailbox shared = send as  
+    if ($DelgateFlag)
+    {
+        #Create A session specific for the invoke commands
+        $Invsession = Get-PSSession -InstanceId (Get-OrganizationConfig).RunspaceId.Guid
+        $TargName = $Target.name
+        $Line = "Checking:  Valid delgates found for $TargName "
+        WriteLine
+        # Loop through each delegate
+        foreach ($IndividualDel in $ValidatedDeliagtes)
+        {
+            $IndividualDel = ($IndividualDel).tostring()
+            if ($IndividualDel.contains("@"))
+            {
+                $MailboxID = $Target.id
+                try
+                {
+                    Invoke-Command -Session $Invsession -ScriptBlock {add-mailboxpermission -identity $Using:MailboxId  -User $Using:IndividualDel -AccessRight FullAccess} > $null
+                    $Line = "Sucsess: $IndividualDel added to $Target"
+                }
+                Catch 
+                {
+                    $Line ="Error: $IndividualDel count NOT be added to $Target"
+                }
+                writeline $Line
+                if ($Target.IsShared)
+                {
+                    try
+                    {
+                        Invoke-Command -Session $Invsession -ScriptBlock {Add-RecipientPermission -identity $Using:MailboxID  -AccessRights SendAs -Trustee $Using:IndividualDel -Confirm:$false} > $Null
+                        $Line = "Sucsess: Sendas added for $IndividualDel to $Target"
+                    }
+                    Catch 
+                    {
+                        $Line ="Error: SendAs not added for $IndividualDel to $Target"
+                    }
+                    Writeline $Line
+                    try
+                    {
+                        Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox $Using:MailboxId  -MessageCopyForSentAsEnabled $True} > $Null
+                        $Line = "Sucsess: MessageCopyForSentAsEnabled for $Target"
+                    }
+                    Catch 
+                    {
+                        $Line ="Error: MessageCopyForSentAsEnabled not set for $Target"
+                    }
+                    Writeline $Line                
+                }
+            }
+        }
+    }
+ $DelgateFlag = $false
 }
-
 Function ProcessUser($MigratedUser, $ForwardingAddress, $AGSEmail)
 {
     # Check and Modify Talent2.corp objects and properties
@@ -620,12 +770,18 @@ ConnectToExch
 ConnectToO365
 CheckandImportModule "ActiveDirectory" 
 #Test the inputfile
-$Inputfile = "C:\temp\test.csv"
-$DependFile ="C:\temp\dependacyreport.csv"
+#$Inputfile = "C:\temp\test.csv"
+#$DependFile ="C:\temp\dependacyreport.csv"
 # Load dependcey file as a has table for quick searching.
-
 $Hash=@{}
-$hash =import-csv -Path $DependFile
+$DependFile ="C:\Temp\dependacyreport.csv"
+$Depends =import-csv -Path $DependFile
+foreach ($dependecy in $Depends)
+{
+    $Hash.Add($dependecy.email, $dependecy.'Inbox Delegated To')
+
+}
+
 
 
 if ($inputfile.Length -ne 0)
