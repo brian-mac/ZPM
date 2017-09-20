@@ -1,3 +1,5 @@
+
+
 Function CloseGracefully()
 {
     # Close all file streams, files and sessions.
