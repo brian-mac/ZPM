@@ -5,8 +5,8 @@ Function CloseGracefully()
     Write-Host $Date  +  " PSSession and log file closed."
     $Stream.Close()
     $fs.Close()
-    $StreamAsia.close()
-    $fsAsia.close()
+    #$StreamAsia.close()
+    #$fsAsia.close()
     
     # Close PS Sessions
     # Get-PSSession | Remove-PSSession
@@ -27,6 +27,7 @@ Function UnpackDelgates ($Delegates)
     $delegates = $delegates.split("|")
     foreach ($Del in $delegates)
     {
+        $del= $del.trim()
         If ($del.Contains("talent2.com") )
         {
             # We need to find the coresponding O365 account
@@ -147,6 +148,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
         foreach ($IndividualDel in $ValidatedDeliagtes)
         {
             $IndividualDel = ($IndividualDel).tostring()
+            $IndividualDel = ($IndividualDel).Trim()
             if ($IndividualDel.contains("@"))
             {
                 $MailboxID = $Target.id
@@ -187,7 +189,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
         }
     }
  $DelgateFlag = $false
- Remove-PSSession -Session $Invsession
+ # Remove-PSSession -Session $Invsession
 }
 
 Function ConnectToO365 ()
@@ -247,15 +249,23 @@ $Stream = New-Object System.IO.StreamWriter($fs)
 #$AsiaLog = "EmailAddress,SamAccountName,GoogleGroup"
 #WriteAsia $AsiaLog
 
-
+ConnectToO365
 
 $Hash=@{}
 $DependFile ="C:\Temp\dependacyreport.csv"
 $Depends =import-csv -Path $DependFile
 foreach ($dependecy in $Depends)
 {
-    $Hash.Add($dependecy.email, $dependecy.'Inbox Delegated To')
+    $DepEmail = ($dependecy.email).Trim()
+    $DepDel = ($dependecy.'Inbox Delegated To'.Trim())
+    $Hash.Add($DepEmail, $DepDel)
 
 }
 # AddDeligations "aaron.clancy@talent2.com" "Aaron.Clancy@AllegisGlobalSolutions.com"
-AddDeligations "ss.accounts@allegisglobalsolutions.com" $null
+#This Loop to use this as standalone from a file, it would usually be used in code that passes one user at a time.
+foreach ($mailbox in $Depends)
+{
+    AddDeligations ($mailbox.email).trim() $null
+}
+#AddDeligations "ss.accounts@allegisglobalsolutions.com" $null
+CloseGracefully
