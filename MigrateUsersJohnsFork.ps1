@@ -58,7 +58,7 @@ Function CloseGracefully()
 }
 Function ConnectToO365 ()
 {
-    $usercredential = Get-Credential -UserName "jkontoni.admin@allegisgroup.com" -Message "Please enter:" 
+    $usercredential = Get-Credential #-UserName "jkontoni.admin@allegisgroup.com" -Message "Please enter:" 
     $PSsessions = Get-PSSession
     foreach ($PsSession in $PSsessions)
     {
@@ -86,12 +86,12 @@ Function ConnectToO365 ()
         }
     }
       #Create A session specific for the invoke commands
-      $Global:Invsession = Get-PSSession -Credential $usercredential -InstanceId (Get-OrganizationConfig).RunspaceId.Guid
+      $Global:Invsession = Get-PSSession  -InstanceId (Get-OrganizationConfig).RunspaceId.Guid
 }
 
 Function ConnectToExch ()
 {
-    $usercredential = Get-Credential -UserName "john.kontonis@allegisgroup.com" -Message "Please enter:" 
+    $usercredential = Get-Credential #-UserName "john.kontonis@allegisgroup.com" -Message "Please enter:" 
     $PSsessions = Get-PSSession
     foreach ($PsSession in $PSsessions)
     {
@@ -521,8 +521,19 @@ Function UnpackDelgates ($Delegates)
                         }
                         else 
                         {
-                            $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del " 
-                            WriteLine $Line
+                            # Sooo if they are already migrated the forwarding will have been removed, here comes the hail Mary
+                            $TrySamAcc = ($TargRecp.Name).split(".")
+                            $TrySamAcc = $TrySamAcc.item(0)
+                            $TargDel = get-mailbox -Identity $TrySamAcc -ErrorAction SilentlyContinue
+                            if ($TargDel)
+                            {
+                                 $ValidDelgates.add($del) 
+                            } 
+                            Else
+                            {
+                                $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del or $TrySamAcc" 
+                                WriteLine $Line
+                            }
                         }
                     } 
                 }
@@ -556,11 +567,11 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
 {
     #Check to see if current mailbox has a dependcey.
     
-    If ($O365Specific)
+    If ($O365Specific.Length -gt 1)
     {
         # This means there will be a discrepencey between O365 account and GoogleUPN.
         # Check for dependecies using Google UPN.
-        If ($hash[$GoogleUPN])
+        If ($hash[$GoogleUPN] )
         {
             # Mailbox delegation found, however we need to use O365 specific value to bind to O365 mailbox
             #Check mailbox existis 
@@ -579,7 +590,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
             }
         }
     }
-    else
+    Else
     {
         If ($hash[$GoogleUPN])
         {
@@ -690,6 +701,7 @@ Function ProcessUser($MigratedUser, $ForwardingAddress, $AGSEmail)
         WriteLine $Error
         Return 
     }
+    AddDeligations $TargetUser.Mail $AGSEmail
     AddGroup $TargetUser $Gaap
     # Check to see if user existis in an OU that equates to a talent2asia.com domain.
     $Disname = $TargetUser.DistinguishedName
@@ -734,7 +746,7 @@ Function ProcessUser($MigratedUser, $ForwardingAddress, $AGSEmail)
     # Call functions for O365 and Exchange Online Objects and properties.
     ChangeForwarding $TargetUser $ForwardingAddress $AGSEmail
     AddSigniture $TargetUser $AGSEmail
-    AddDeligations $TargetUser $AGSEmail
+    
 
     $AGSEmail = $null
     $ForwardingAddress = $null
@@ -770,7 +782,7 @@ ConnectToExch
 ConnectToO365
 CheckandImportModule "ActiveDirectory" 
 #Test the inputfile
-#$Inputfile = "C:\temp\test.csv"
+$Inputfile = "C:\temp\test.csv"
 #$DependFile ="C:\temp\dependacyreport.csv"
 # Load dependcey file as a has table for quick searching.
 $Hash=@{}
