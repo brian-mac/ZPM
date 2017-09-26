@@ -27,6 +27,7 @@ Function UnpackDelgates ($Delegates)
     $delegates = $delegates.split("|")
     foreach ($Del in $delegates)
     {
+        $Del = $del.trim()
         If ($del.Contains("talent2.com") )
         {
             # We need to find the coresponding O365 account
@@ -97,7 +98,7 @@ Function UnpackDelgates ($Delegates)
     $ValidDelgates =$null
 }
 
-Function AddDeligations ($GoogleUPN,$O365Specific)
+Function RemoveDelegations ($GoogleUPN,$O365Specific)
 {
     #Check to see if current mailbox has a dependcey.
     
@@ -164,11 +165,11 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
                 try
                 {
                     Invoke-Command -Session $Invsession -ScriptBlock {Remove-mailboxpermission -identity $Using:MailboxId  -User $Using:IndividualDel -AccessRight FullAccess -Confirm:$false} > $null
-                    $Line = "Sucsess: $IndividualDel added to $Target"
+                    $Line = "Sucsess: $IndividualDel Removed to $Target"
                 }
                 Catch 
                 {
-                    $Line ="Error: $IndividualDel count NOT be added to $Target"
+                    $Line ="Error: $IndividualDel count NOT be Removed to $Target"
                 }
                 writeline $Line
                 if ($Target.IsShared)
@@ -176,11 +177,11 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
                     try
                     {
                         Invoke-Command -Session $Invsession -ScriptBlock {Remove-RecipientPermission -identity $Using:MailboxID  -AccessRights SendAs -Trustee $Using:IndividualDel -Confirm:$false} > $Null
-                        $Line = "Sucsess: Sendas added for $IndividualDel to $Target"
+                        $Line = "Sucsess: Sendas removed for $IndividualDel to $Target"
                     }
                     Catch 
                     {
-                        $Line ="Error: SendAs not added for $IndividualDel to $Target"
+                        $Line ="Error: SendAs not removed for $IndividualDel to $Target"
                     }
                     Writeline $Line
                    # try
@@ -245,7 +246,7 @@ $mode       = [System.IO.FileMode]::Append
 $ModeAsia   = [System.IO.FileMode]::Create
 $access     = [System.IO.FileAccess]::Write
 $sharing    = [IO.FileShare]::Read
-$LogPath    = [System.IO.Path]::Combine("C:\temp\OMigratedT2Tasks.txt")
+$LogPath    = [System.IO.Path]::Combine("C:\temp\RemovedPermissions.txt")
 $AsiaLog    = [System.IO.Path]::Combine($Temp_Asia_log)
 
 # create the FileStream and StreamWriter objects
@@ -270,11 +271,11 @@ foreach ($dependecy in $Depends)
     $Hash.Add($DepEmail, $DepDel)
 
 }
-# AddDeligations "aaron.clancy@talent2.com" "Aaron.Clancy@AllegisGlobalSolutions.com"
+# RemoveDelegations "aaron.clancy@talent2.com" "Aaron.Clancy@AllegisGlobalSolutions.com"
 #This Loop to use this as standalone from a file, it would usually be used in code that passes one user at a time.
 foreach ($mailbox in $Depends)
 {
-    AddDeligations ($mailbox.email).trim() $null
+    RemoveDelegations ($mailbox.email).trim() $null
 }
-#AddDeligations "ss.accounts@allegisglobalsolutions.com" $null
+#RemoveDelegations "ss.accounts@allegisglobalsolutions.com" $null
 CloseGracefully

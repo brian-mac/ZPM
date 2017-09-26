@@ -10,7 +10,7 @@
 *Creates an output of all Asia users C:\temp\AsiaAddToGApp.csv, this  file is used as an input for a script that runs on the Talent2Asia.com domain.
 
 .Description
-Version 4.5.3 20170912 (Johns Fork)
+Version 4.6.0 20170926 (Johns Fork)
 The script can either create act on a single user at a time or multiple users using a CSV file.
 The script has two input parameters: Target User email address and forwarding email address value.
 
@@ -77,8 +77,8 @@ Function ConnectToO365 ()
         }
         Else
         {
-           
-        } $session = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $UserCredential -Authentication Basic -AllowRedirection
+            $session = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $UserCredential -Authentication Basic -AllowRedirection 
+        } 
         Import-PSSession $session  
         If (!$session)
         {
@@ -106,13 +106,14 @@ Function ConnectToExch ()
         if ($ProxyAddress.address)
         {
             $proxyOptions = New-PSSessionOption -ProxyAccessType IEConfig
-            $ExSession = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.allegisgroup.com/powershell/ -Credential $UserCredential -Authentication Basic -AllowRedirection  -SessionOption $proxyOptions
+            $Global:ExSession = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.allegisgroup.com/powershell/ -Credential $UserCredential -Authentication Basic -AllowRedirection  -SessionOption $proxyOptions
         }
         Else
         {
-           
-        } $ExSession = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.allegisgroup.com/powershell/ -Credential $UserCredential -Authentication Basic -AllowRedirection
-        Import-PSSession $ExSession  -Prefix OnPrem 
+            $Global:ExSession = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.allegisgroup.com/powershell/ -Credential $UserCredential -Authentication Basic -AllowRedirection
+            
+        }  
+        Import-PSSession $ExSession  -Prefix OnPrem
         If (!$ExSession)
         {
             CloseGracefully
@@ -169,17 +170,17 @@ Function AddGroup($TargetUser,$TargetGroup)
 
 Function AddToDlist ($TargetUser, $TargetDlist)
 {
-    Add-OnpremDistributionGroupMember -Identity $TargetDlist -Member $TargetUser  -ErrorAction SilentlyContinue 
-    If ($DlError)
+    Try
+    {
+        Invoke-Command -Session $Exsession -ScriptBlock {Add-DistributionGroupMember -Identity $Using:TargetDlist -Member $Using:TargetUser} -ErrorAction Stop > $null      
+        $Line = "Sucsess: $TargetUser has been added to $TargetDlist"
+        Writeline $Line
+    }
+    Catch
     {
         $line = "Error: could not add $TargetUser into $TargetDlist"
         Writeline $line
-    }
-    else
-    {
-        $Line = "Sucsess: $TargetUser has been added to $TargetDlist"
-        Writeline $Line
-    }  
+    } 
 }
 
 function AddSigniture ($targetUser,$AGSEmail)
@@ -310,19 +311,47 @@ Function ChangeForwarding ($TargetUser, $ForwardingAddress, $AGSEmail)
                 $T2Conact = $TestUser.ForwardingAddress
             }
         }
-        Set-Mailbox -identity $TargetIdentity -ForwardingAddress  $Null
+        
+        Try
+        {
+                Set-Mailbox -identity $TargetIdentity -ForwardingAddress  $Null -ErrorAction Stop
+                $Line = "Sucsess: $targetIdentity O365 Forwarding address has been set to Null"
+                WriteLine $Line
+        }
+        catch
+        {
+            $Line = "Error: $targetIdentity O365 Forwarding address has NOT been set to Null"
+            WriteLine $Line
+        }
         if($ForwardingAddress -ne "" -and $ForwardingAddress -ne "None")
         {
-            Set-Mailbox -identity $TargetIdentity -ForwardingSmtpAddress  $ForwardingAddress
-            $Line = "Sucsess: $TargetIdentity  O365 forwarding has been set to $ForwardingAddress."
-            WriteLine $Line
+            Try
+            {
+                Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox -identity $Using:TargetIdentity -ForwardingSmtpAddress  $Using:ForwardingAddress} -ErrorAction Stop > $null
+                $Line = "Sucsess: $TargetIdentity  O365 ForwardingSMTPAddress has been set to $ForwardingAddress."
+                WriteLine $Line
+            }
+            catch
+            {
+                $Line = "Error: $TargetIdentity  O365 ForwardingSMTPAddress has NOT been set to $ForwardingAddress."
+                WriteLine $Line
+            }
         }
         Else
         {
-            Set-Mailbox -identity $TargetIdentity -ForwardingSmtpAddress  $Null
+            Try
+            {
+                Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox -identity $Using:TargetIdentity -ForwardingSmtpAddress  $Using:null} -ErrorAction Stop > $null
+                $Line = "Sucsess: $TargetIdentity  O365 ForwardingSMTPAddress has been set to Null."
+                WriteLine $Line
+            }
+            Catch 
+            {
+                $Line = "Error: $TargetIdentity  O365 forwarding NOT has been set to Null."
+                WriteLine $Line
+            }
         }
-        $Line = "Sucsess: $TargetIdentity  O365 forwarding has been set to Null."
-        WriteLine $Line
+        
         If ($T2Conact)
         {
             Remove-T2Contact $T2Conact $TargetIdentity
@@ -629,7 +658,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
                 $MailboxID = $Target.id
                 try
                 {
-                    Invoke-Command -Session $Invsession -ScriptBlock {add-mailboxpermission -identity $Using:MailboxId  -User $Using:IndividualDel -AccessRight FullAccess} > $null
+                    Invoke-Command -Session $Invsession -ScriptBlock {add-mailboxpermission -identity $Using:MailboxId  -User $Using:IndividualDel -AccessRight FullAccess} -ErrorAction Stop > $null
                     $Line = "Sucsess: $IndividualDel added to $Target"
                 }
                 Catch 
@@ -641,7 +670,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
                 {
                     try
                     {
-                        Invoke-Command -Session $Invsession -ScriptBlock {Add-RecipientPermission -identity $Using:MailboxID  -AccessRights SendAs -Trustee $Using:IndividualDel -Confirm:$false} > $Null
+                        Invoke-Command -Session $Invsession -ScriptBlock {Add-RecipientPermission -identity $Using:MailboxID  -AccessRights SendAs -Trustee $Using:IndividualDel -Confirm:$false} -ErrorAction Stop > $Null
                         $Line = "Sucsess: Sendas added for $IndividualDel to $Target"
                     }
                     Catch 
@@ -651,7 +680,7 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
                     Writeline $Line
                     try
                     {
-                        Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox $Using:MailboxId  -MessageCopyForSentAsEnabled $True} > $Null
+                        Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox $Using:MailboxId  -MessageCopyForSentAsEnabled $True} -ErrorAction Stop > $Null
                         $Line = "Sucsess: MessageCopyForSentAsEnabled for $Target"
                     }
                     Catch 

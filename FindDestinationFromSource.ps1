@@ -83,20 +83,20 @@ $fsMove = New-Object IO.FileStream($MoveLog, $ModeMove, $access, $sharing)
 $StreamMove = New-Object System.IO.StreamWriter($fsMove)
 
 #Write headers for AsiaAddToGapp.csv
-$MoveLine = "EmailAddress,DestinationOU"
-WriteMove $MoveLine
+#$MoveLine = "EmailAddress,DestinationOU"
+#WriteMove $MoveLine
 ConnectToO365
 
-$SourceEmails = Import-CSV "C:\temp\MigrationStatusReport.csv"
+$SourceEmails = Import-CSV "C:\temp\delta.csv"
 foreach ($SourceMailbox in $SourceEmails)
 {
     $SourceEmail = ($SourceMailbox.Source).trim()
-    $sourcemail = $sourcemail.Replace(" ",".")
+    #$sourcemail = $sourcemail.Replace(" ",".")
     $TargMailbox = Get-Mailbox $SourceEmail -ErrorAction  SilentlyContinue
     if ($TargMailbox)
     {
         # Great Google SMTP address matched an O365 mailbox 
-        $Line =  "Sucsess:   Google: " + $SourceEmail + " : Matches O365: UPN:" +  $targMailbox.UserPrincipleName + " : PrimarySmtpAddress:" + $TargMailbox.PrimarySmtpAddress
+        $Line =  "Sucsess:   Google: " + $SourceEmail + " : Matches O365: UPN:" +  $targMailbox.UserPrincipalName + " : PrimarySmtpAddress:" + $TargMailbox.PrimarySmtpAddress
         WriteLine   $Line # need a cant find error some where 
     }
     else
@@ -105,7 +105,7 @@ foreach ($SourceMailbox in $SourceEmails)
         $TargMailbox = get-mailbox -Filter "$_.Forwardingsmtpaddress -eq '$SourceEmail'" -ErrorAction SilentlyContinue
         if ($TargMailbox)
         {
-            $Line =  "Sucsess:   Google: " + $SourceEmail + " : Matches O365: UPN:" +  $targMailbox.UserPrincipleName + " : PrimarySmtpAddress:" + $TargMailbox.PrimarySmtpAddress
+            $Line =  "Sucsess:   Google: " + $SourceEmail + " : Matches O365: UPN:" +  $targMailbox.UserPrincipalName + " : PrimarySmtpAddress:" + $TargMailbox.PrimarySmtpAddress
             WriteLine   $Line #need a cant find error some where
         }
         else
@@ -123,14 +123,20 @@ foreach ($SourceMailbox in $SourceEmails)
                     If ($TargMailBox)
                     {
                         # Ok we found a mailbox that forwards to the Google SMTP address.
-                        $Line =  "Sucsess:   Google: " + $SourceEmail + " : Matches O365: UPN:" +  $targMailbox.UserPrincipleName + " : PrimarySmtpAddress:" + $TargMailbox.PrimarySmtpAddress
+                        $Line =  "Sucsess:   Google: " + $SourceEmail + " : Matches O365: UPN:" +  $targMailbox.UserPrincipalName + " : PrimarySmtpAddress:" + $TargMailbox.PrimarySmtpAddress
                         WriteLine $Line
                     }
                     else 
                     {
                         $Line = "Error:  No Matching O365 mailbox for: $SourceEmail"
+                        WriteLine $Line
                     }
                 }
+            }
+            else
+            {
+                $Line = "Error:  No Matching O365 mailbox for: $SourceEmail"
+                WriteLine $Line
             } 
         }
     }

@@ -62,3 +62,4 @@ foreach ($MigratedUser in $SMigratedUsersT2)
    $Stream.writeline( $line )
     Write-Host $Line
 }
+CloseGracefully
