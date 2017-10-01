@@ -1,18 +1,55 @@
+<# 
+.synopsis 
+ This script will: 
+* Set the LocaleID and TimeZone of a users OneDrive site based on their Country and Office location.
+
+.Description
+Version 1.0.0 20171001 RTM
+The script has 1 parameter, the path to the log file.  The credentials for SharePoint consisit of a 
+$Username variable, amd a path to a encrypted password.  The SecurePassword function can be called with the
+"Store" value to prompt for a password and save it to the path specified.
+The function ConnectToExchange cn be called with the parameters of a user name and path to an encrypted password
+or with no parameters and it will prompt for credentials.
+
+.Parameter LogFile
+The path to the log file.
+
+.Outputs
+System.io.FileStream Appendes or writed to a file specified by the input parameter.
+#>
 [CmdletBinding (DefaultParameterSetName="Set 1")]
 param (
     [Parameter(Mandatory=$True,HelpMessage="Please enter name for log file",Parametersetname = "Set 1" )][string] $LogFile
 )
 
 
-Function CreateFile ($ReqPath, $ReqMode)
+function SecurePassword ($Target_Path, $Action)
 {
-   
-    
-    # create the FileStream and StreamWriter objects
+    <# Function will either encrypt and save a password to the file specified in the $Target_Path
+    Or it will return an encrypted password from the file specified in $Target_Path.
+    Returns password 
+    #>
+
+    If ($Action -eq "Store")
+    {
+        $Secure = Read-Host -AsSecureString
+        $Encrypted = ConvertFrom-SecureString -SecureString $Secure -Key (244,102,80,104,223,19,65,130,183,11,132,245,74,147,46,142)
+        $Encrypted | Set-Content $Path  
+    }
+    elseif ($Action -eq "Retreive")
+    {
+        $Secure = Get-Content $Target_Path | ConvertTo-SecureString -Key (244,102,80,104,223,19,65,130,183,11,132,245,74,147,46,142)
+    }
+    Return $Secure
+}
+Function CreateFile ($ReqPath, $ReqMode)
+{   
+    # Create the FileStream and StreamWriter objects, returns Stream Object
     $date = get-date -Format d
     $date = $date.split("/")
     $date = $date.item(2) + $date.item(1) + $date.item(0)
-    $ReqPath = "$ReqPath$date.csv"
+    $FileParts = $ReqPath.split(".")
+    $ReqPath = $FileParts.item(0) + $date +"." + $FileParts.Item(1)
 
     $mode       = [System.IO.FileMode]::$ReqMode
     $access     = [System.IO.FileAccess]::Write
@@ -21,10 +58,18 @@ Function CreateFile ($ReqPath, $ReqMode)
     $fs = New-Object IO.FileStream($LogPath, $mode, $access, $sharing)
     Return $fs
 }
+function WriteLine ($LineTxt,$Stream) 
+{
+    $Date = get-date -Format G
+    $Date = $Date + "    : "  
+    $LineTxt = $date + $LineTxt  
+    $Stream.writeline( $LineTxt )
+}
 Function CloseGracefully($Stream,$FileSystem)
 {
-    # Close all file streams, files and sessions.
-    $Stream.writeline( $Date +  " PSSession and log file closed.")
+    # Close all file streams, files and sessions. Call this for each FileStream and FileSystem pair.
+    $Line = $Date +  " PSSession and log file closed."
+    WriteLine $Line
     Write-Host $Date  +  " PSSession and log file closed."
     $Stream.Close()
     $FileSystem.Close() 
@@ -33,19 +78,33 @@ Function CloseGracefully($Stream,$FileSystem)
     $error.clear()
     Exit
 }
-Function ConnectToExch ()
+Function ConnectToExch ($Username, $Target_Path)
 {
+    <# Connects to a remote Exchange enviroment.  If a UserName is passed it will look in $Target_Path
+       for the Encrypted password and use those for credentials. Otherwise it will prompt interactivley
+       If a vild session exists it will not create a new session 
+    #>
+
     $PSsessions = Get-PSSession
     foreach ($PsSession in $PSsessions)
     {
-        If ($PsSession.computername -eq  "outlook.allegisgroup.com")
+        If ($PsSession.computername -eq  "outlook.allegisgroup.com" -and $PsSession.State -ne "Broken")
         {
             $ExSessionExists = $True
         }
     }
     If ( -not ($ExSessionExists))
     {
-        $usercredential = Get-Credential  -Message "Please enter you credentials for Remote Exchange:" 
+       if ($Username)
+       {
+        $SecPass = SecurePassword $Target_Path "Retreive"
+        $UserCredential = New-Object System.Management.Automation.PSCredential($Username,$SecPass)
+       } 
+       Else
+       {
+        $UserCredential = Get-Credential  -Message "Please enter you credentials for Remote Exchange:" 
+       }
+       
         $ProxyAddress = [System.Net.WebProxy]::GetDefaultProxy() |select-object address
         if ($ProxyAddress.address)
         {
@@ -56,57 +115,60 @@ Function ConnectToExch ()
         {
             $Global:ExSession = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.allegisgroup.com/powershell/ -Credential $UserCredential -Authentication Basic -AllowRedirection
         } 
-        Import-PSSession $ExSession  -Prefix OnPrem 
+        Import-PSSession $ExSession  # -Prefix OnPrem only requires if dual Exch O365 sessions
         If (!$ExSession)
         {
-            CloseGracefully #Hmm maybe call this function before opening the files, stop instead?
+            Exit 
         }
     }
 }
 
-function WriteLine ($LineTxt,$Stream) 
-{
-    $Date = get-date -Format G
-    $Date = $Date + "    : "  
-    $LineTxt = $date + $LineTxt  
-    $Stream.writeline( $LineTxt )
-}
 
-function FindTimeZone ($targeOffice)
+
+function FindTimeZone ($targetOffice)
 {
-    # Find TimeZone Based On City
-    $TargetOffice = $TargetOffice.left(4)
+    # Find TimeZone based on Office code, defaults to Singapore as Asia has more staff.
+    $TargetOffice = $TargetOffice.substring(0,4)
     Switch -wildcard ($TargetOffice) 
     {
-        "AU*"  {$TimeZone = "A.U.S. Eastern Standard Time"
-                  $TZCode = 255}
-        "AUQ*"  {$TimeZone = "E. Australia Standard Time"
-                  $TZCode = 260}
-        "HK*"   {$TimeZone = "China Standard Time"
-                   $TZCode = 210  }
-        "CN*"   {$TimeZone = "China Standard Time"
-                   $TZCode = 210 }
-        "SG*"   {$TimeZone = "Singapore Standard Time"
-                   $TZCode = 215 }
-        "MY*"   {$TimeZone = "Singapore Standard Time"
-                   $TZCode = 215 }
-        "JP*"   {$TimeZone = "Tokyo Standard Time"
-                   $TZCode = 235 }
-        "NZ*"   {$TimeZone = "New Zealand Standard Time"
-                   $TZCode = 290 }
-        Default  {$TimeZone = "Singapore Standard Time"
-                  $TZCode = 215}
+        "AU*"  {$TimeZone = "(UTC+10:00) Canberra, Melbourne, Sydney"
+                  $TZCode = 76}
+        "AUQ*"  {$TimeZone = "(UTC+10:00) Brisbane"
+                  $TZCode = 18}
+        "HK*"   {$TimeZone = "(UTC+08:00) Beijing, Chongqing, Hong Kong, Urumqi"
+                   $TZCode = 45  }
+        "CN*"   {$TimeZone = "(UTC+08:00) Beijing, Chongqing, Hong Kong, Urumqi"
+                   $TZCode = 45 }
+        "SG*"   {$TimeZone = "(UTC+08:00) Kuala Lumpur, Singapore"
+                   $TZCode = 21 }
+        "MY*"   {$TimeZone = "(UTC+08:00) Kuala Lumpur, Singapore"
+                   $TZCode = 21 }
+        "JP*"   {$TimeZone = "(UTC+09:00) Osaka, Sapporo, Tokyo"
+                   $TZCode = 20 }
+        "NZ*"   {$TimeZone = "UTC+12:00) Auckland, Wellington"
+                   $TZCode = 17 }
+        Default  {$TimeZone = "(UTC+08:00) Kuala Lumpur, Singapore"
+                  $TZCode = 21}
     }
-    Return $TimeZone
+    Return $TZCode
 }
 
 
 # Main Code
-
+<#Connect to Exchange, pass the UserName and Path to the encrypted password.
+  If no parrameters passed, you will be prompted for them
+#>
+ConnectToExch "Brian.mcelhinney@allegisgroup.com" "C:\temp\e.txt"  
+<# Create the log file specifed from the input parameter.  
+   Append will append to an exisitng file or create a new one if it does not exisit
+   Write will create a new file or overwrite an existing one
+   The file will have todays date appened to it
+#>
 $LogFile = CreateFile $LogFile  "Append"
 $LogStream = New-Object System.IO.StreamWriter($LogFile)
-ConnectToExch
 
+
+# Build hash for Country LocaleID pairs.
 $CountryHash = @{
 
 "Albania"	=	"1052"	;
@@ -244,86 +306,132 @@ $CountryHash = @{
 }
 
 
-
+# Load .Net assemblies, use partial name as PC and Servers store the DL's in diffrent locations.
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client")
-
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime")
-
-
-
-Add-Type -Path "C:\Program Files\Common Files\Microsoft Shared\Web Server Extensions\16\ISAPI\Microsoft.SharePoint.Client.dll"
-Add-Type -Path "C:\Program Files\Common Files\Microsoft Shared\Web Server Extensions\16\ISAPI\Microsoft.SharePoint.Client.Runtime.dll"
-
-
-
 
 $GroupToCheck = "Criteria_DLIST-Allegis_APAC-All_Criteria" #should we think about having this as a script parameter for EMEA etc...?
 
 Try
 {
-    $MembersToCheck = Invoke-Command -Session $Exsession -ScriptBlock { get-distributiongroupmember -resultsize unlimited $using:GroupToCheck}
+    <# O365 runs in no language mode and does not report errors when using commandlets 
+       bound to the remote session. You need to use Invoke-Command to get an error value. 
+    Force of habit using it with Exchange online
+    #>
+
+    $MembersToCheck = Invoke-Command -Session $Exsession -ScriptBlock { get-distributiongroupmember -resultsize unlimited $using:GroupToCheck} -ErrorAction Stop    
     $Line = "Sucesess: Found Target Group $GroupToCheck"
     WriteLine $Line $LogStream
 }
 Catch 
 {
     $ErrorLine = "Error: Could not find group $GroupToCheck"
-    WriteLine $ErrorLine    $LogStream
+    WriteLine $ErrorLine $LogStream
 }
 
-
-
 #Authenticate to Site
-$Username = "change to admin username"
-$Password = "Enter Password here" | ConvertTo-SecureString -Force -AsPlainText
+# Replace with System account etc...
+$Username = "Brian.mcelhinney@allegisgroup.com" 
+# Path to the file you saved the enctypted password
+$Password = SecurePassword "C:\Temp\e.txt" "Retreive" 
 $Site = "https://allegiscloud.sharepoint.com"
 $Context = New-Object Microsoft.SharePoint.Client.ClientContext($Site)
 $Creds = New-Object Microsoft.SharePoint.Client.SharePointOnlineCredentials($Username,$Password)
 $Context.Credentials = $Creds
 
-<#
-#Retrieve the time zones that are available
+<#Retrieve the time zones that are available
 $TZs = $Context.Web.RegionalSettings.TimeZones
 $Context.Load($TZs)
 $Context.ExecuteQuery()
+$tzs > "C:\temp\Timez.csv"
 #>
 
 
 #Update the LocaleID
 
-
+# Loop through each member of the DistList
 foreach ($member in $MembersToCheck)
 {
     if ($member.CountryOrRegion -eq $null) 
     {
-		Write-Host "Country is null. Setting Australia as the LocaleID for $($member.WindowsLiveID)"
-        $line = "Country is null. Setting Australia as the LocaleID for $($member.WindowsLiveID)"
+        Write-Host "Country is null. Setting Australia as the LocaleID for $($member.PrimarySmtpAddress)"
+        $line = "Country is null. Setting Australia as the LocaleID for $($member.PrimarySmtpAddress)"
         WriteLine $Line $LogStream
 		$LocaleID = "3081"
     }
     elseif ($CountryHash.Item($member.CountryOrRegion))
 	{ 
-		Write-Host "Will set" $CountryHash.Item($member.CountryOrRegion) "as the LocaleID for $($member.WindowsLiveID)"
-        $line = "Will set $($CountryHash.Item($member.CountryOrRegion)) as the LocaleID for $($member.WindowsLiveID.toString())"
+        Write-Host "Will set" $CountryHash.Item($member.CountryOrRegion) "as the LocaleID for $($member.PrimarySmtpAddress)"
+        $line = "Will set $($CountryHash.Item($member.CountryOrRegion)) as the LocaleID for $($member.PrimarySmtpAddress)"
         Writeline $line $LogStream
         $LocaleID = $CountryHash.Item($member.CountryOrRegion)	
     }
     Else 
     {
-        Write-Host "Cannont find $($member.CountryOrRegion) in LocaleID list. Setting Australia as the LocaleID for $($member.WindowsLiveID)"
-		$Line =  "Cannont find $($member.CountryOrRegion) in LocaleID list. Setting Australia as the LocaleID for $($member.WindowsLiveID)"
-        WriteLine $Line, $LogStream
+        Write-Host "Warning: Cannot find $($member.CountryOrRegion) in LocaleID list. Setting Australia as the LocaleID for $($member.PrimarySmtpAddress)"
+        $Line =  "Warning: Cannot find $($member.CountryOrRegion) in LocaleID list. Setting Australia as the LocaleID for $($member.PrimarySmtpAddress)"
+        WriteLine $Line $LogStream
         $LocaleID = "3081"
     }	
     $Office = $Member.Office 
+    # Call FindTimeZone to determine timezone based on the office
     $TimeZone = FindTimeZone $Office
-    $OneDriveSiteName = "https://allegiscloud-my.sharepoint.com/personal/" + ($member.WindowsLiveID.replace(".","_")) -replace "@","_"
-    $Context2 = New-Object Microsoft.SharePoint.Client.ClientContext($OneDriveSiteName)
-    $Context2.Credentials = $Creds
-    $Context2.ExecuteQuery()
-    $Context2.Web.RegionalSettings.LocaleId = $LocaleID
-    $Context2.Web.RegionalSettings.TimeZone = $TimeZone
-    $Context2.Web.Update()
-    $Context2.ExecuteQuery()
+    # Test Code $OneDriveSiteName = "https://allegiscloud-my.sharepoint.com/personal/brian_mcelhinney_allegisgroup_com1"
+    try
+    {
+        # Hmm dont think this will throw an error.
+        $OneDriveSiteName = "https://allegiscloud-my.sharepoint.com/personal/" + ($member.PrimarySmtpAddress.replace(".","_")) -replace "@","_"
+        $Context2 = New-Object Microsoft.SharePoint.Client.ClientContext($OneDriveSiteName)
+        $Line = "Sucsess: found $OneDriveSiteName"
+        WriteLine $line $LogStream
+    }
+    Catch 
+    {
+        $Line = "Error: Could not find $OneDriveSiteName"
+        WriteLine $Line $logStream
+    }
+    try 
+    {
+        $Context2.Credentials = $Creds
+        $Context2.ExecuteQuery()
+    }
+    catch 
+    {
+        $Line = "Error: Credentials or other binding issue"
+        WriteLine $Line $LogStream
+    }
+    try 
+    {
+        $Context2.Web.RegionalSettings.LocaleId = $LocaleID
+        $Line = "Sucsess: LocaleID set to $LocaleID"
+        WriteLine $line $LogStream
+    }
+    catch 
+    {
+        $Line = "Error: LocaleId could NOT be set to $LocaleID"
+        WriteLine $line $LogStream
+    }
+    try 
+    {
+        $Context2.Web.RegionalSettings.TimeZone = $Context2.Web.RegionalSettings.TimeZones.GetbyID($TimeZone)
+        $Line = "Sucsess: Time Zone has been set to TimeZoneID $TimeZone"
+        WriteLine $Line $LogStream 
+    }
+    catch 
+    {
+        $line = "Error: TimeZone has NOT been set to TimeZoneID $TimeZone"
+        WriteLine $Line $LogStream
+    }
+    try 
+    {
+        $Context2.Web.Update()
+        $Context2.ExecuteQuery()
+    }
+    catch 
+    {
+        $Line = "Error:  Onedrive site not updated, unxepected this was"
+        WriteLine $Line $LogStream
+    }
+    
 }
-CloseGracefully ($LogStream,$LogFile)
+CloseGracefully $LogStream $LogFile
