@@ -70,7 +70,7 @@ Function ConnectToO365 ()
     If ( -not ($O365SessionExists))
     {
         $ProxyAddress = [System.Net.WebProxy]::GetDefaultProxy() |select-object address
-        if ($ProxyAddress.address)
+        if ($ProxyAddress)
         {
             $proxyOptions = New-PSSessionOption -ProxyAccessType IEConfig
             $session = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $UserCredential -Authentication Basic -AllowRedirection  -SessionOption $proxyOptions
@@ -103,7 +103,7 @@ Function ConnectToExch ()
     If ( -not ($ExSessionExists))
     {
         $ProxyAddress = [System.Net.WebProxy]::GetDefaultProxy() |select-object address
-        if ($ProxyAddress.address)
+        if ($ProxyAddress)
         {
             $proxyOptions = New-PSSessionOption -ProxyAccessType IEConfig
             $Global:ExSession = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.allegisgroup.com/powershell/ -Credential $UserCredential -Authentication Basic -AllowRedirection  -SessionOption $proxyOptions
