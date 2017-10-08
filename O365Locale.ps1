@@ -69,7 +69,7 @@ Function CloseGracefully($Stream,$FileSystem)
 {
     # Close all file streams, files and sessions. Call this for each FileStream and FileSystem pair.
     $Line = $Date +  " PSSession and log file closed."
-    WriteLine $Line
+    WriteLine $Line $stream 
     Write-Host $Date  +  " PSSession and log file closed."
     $Stream.Close()
     $FileSystem.Close() 
@@ -115,6 +115,51 @@ Function ConnectToExch ($Username, $Target_Path)
         {
             $Global:ExSession = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.allegisgroup.com/powershell/ -Credential $UserCredential -Authentication Basic -AllowRedirection
         } 
+        Import-PSSession $ExSession   -Prefix OnPrem 
+        If (!$ExSession)
+        {
+            Exit 
+        }
+    }
+}
+
+Function ConnectToO365 ($Username, $Target_Path)
+{
+    <# Connects to O365 OnLine enviroment.  If a UserName is passed it will look in $Target_Path
+       for the Encrypted password and use those for credentials. Otherwise it will prompt interactivley
+       If a vild session exists it will not create a new session 
+    #>
+
+    $PSsessions = Get-PSSession
+    foreach ($PsSession in $PSsessions)
+    {
+        If ($PsSession.computername -eq  "outlook.office365.com" -and $PsSession.State -ne "Broken")
+        {
+            $ExSessionExists = $True
+        }
+    }
+    If ( -not ($ExSessionExists))
+    {
+       if ($Username)
+       {
+        $SecPass = SecurePassword $Target_Path "Retreive"
+        $UserCredential = New-Object System.Management.Automation.PSCredential($Username,$SecPass)
+       } 
+       Else
+       {
+        $UserCredential = Get-Credential  -Message "Please enter you credentials for Remote Exchange:" 
+       }
+       
+        $ProxyAddress = [System.Net.WebProxy]::GetDefaultProxy() |select-object address
+        if ($ProxyAddress.address)
+        {
+            $proxyOptions = New-PSSessionOption -ProxyAccessType IEConfig
+            $Global:ExSession = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $UserCredential -Authentication Basic -AllowRedirection  -SessionOption $proxyOptions
+        }
+        Else
+        {
+            $Global:ExSession = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $UserCredential -Authentication Basic -AllowRedirection
+        } 
         Import-PSSession $ExSession  # -Prefix OnPrem only requires if dual Exch O365 sessions
         If (!$ExSession)
         {
@@ -123,15 +168,13 @@ Function ConnectToExch ($Username, $Target_Path)
     }
 }
 
-
-
 function FindTimeZone ($targetOffice)
 {
     # Find TimeZone based on Office code, defaults to Singapore as Asia has more staff.
     $TargetOffice = $TargetOffice.substring(0,4)
     Switch -wildcard ($TargetOffice) 
     {
-        "AU*"  {$TimeZone = "(UTC+10:00) Canberra, Melbourne, Sydney"
+        "AUN*"  {$TimeZone = "(UTC+10:00) Canberra, Melbourne, Sydney"
                   $TZCode = 76}
         "AUQ*"  {$TimeZone = "(UTC+10:00) Brisbane"
                   $TZCode = 18}
@@ -142,6 +185,8 @@ function FindTimeZone ($targetOffice)
         "SG*"   {$TimeZone = "(UTC+08:00) Kuala Lumpur, Singapore"
                    $TZCode = 21 }
         "MY*"   {$TimeZone = "(UTC+08:00) Kuala Lumpur, Singapore"
+                   $TZCode = 21 }
+        "PH0*"   {$TimeZone = "(UTC+08:00) Kuala Lumpur, Singapore"
                    $TZCode = 21 }
         "JP*"   {$TimeZone = "(UTC+09:00) Osaka, Sapporo, Tokyo"
                    $TZCode = 20 }
@@ -159,6 +204,7 @@ function FindTimeZone ($targetOffice)
   If no parrameters passed, you will be prompted for them
 #>
 ConnectToExch "Brian.mcelhinney@allegisgroup.com" "C:\temp\e.txt"  
+ConnectToO365 "Brian.mcelhinney@allegisgroup.com" "C:\temp\e.txt"
 <# Create the log file specifed from the input parameter.  
    Append will append to an exisitng file or create a new one if it does not exisit
    Write will create a new file or overwrite an existing one
@@ -310,8 +356,9 @@ $CountryHash = @{
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client")
 [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.SharePoint.Client.Runtime")
 
-$GroupToCheck = "Criteria_DLIST-Allegis_APAC-All_Criteria" #should we think about having this as a script parameter for EMEA etc...?
-
+# $GroupToCheck = "Criteria_DLIST-Allegis_APAC-All_Criteria" #should we think about having this as a script parameter for EMEA etc...?
+# Test group
+$GroupToCheck = "DLIST-Allegis_brian test 1"
 Try
 {
     <# O365 runs in no language mode and does not report errors when using commandlets 
@@ -373,7 +420,9 @@ foreach ($member in $MembersToCheck)
         WriteLine $Line $LogStream
         $LocaleID = "3081"
     }	
-    $Office = $Member.Office 
+    # Mailbox contains the APAC Site Code, the mebmer do the Dlist does not.
+    $mailbox = Get-mailbox $Member.PrimarySmtpAddress
+    $Office = $mailbox.Office 
     # Call FindTimeZone to determine timezone based on the office
     $TimeZone = FindTimeZone $Office
     # Test Code $OneDriveSiteName = "https://allegiscloud-my.sharepoint.com/personal/brian_mcelhinney_allegisgroup_com1"
@@ -382,22 +431,23 @@ foreach ($member in $MembersToCheck)
         # Hmm dont think this will throw an error.
         $OneDriveSiteName = "https://allegiscloud-my.sharepoint.com/personal/" + ($member.PrimarySmtpAddress.replace(".","_")) -replace "@","_"
         $Context2 = New-Object Microsoft.SharePoint.Client.ClientContext($OneDriveSiteName)
-        $Line = "Sucsess: found $OneDriveSiteName"
+        $Line = "Sucsess: Contex2 built"
         WriteLine $line $LogStream
     }
     Catch 
     {
-        $Line = "Error: Could not find $OneDriveSiteName"
+        $Line = "Error: Could not build context2 URL $OneDriveSiteName"
         WriteLine $Line $logStream
     }
     try 
     {
         $Context2.Credentials = $Creds
         $Context2.ExecuteQuery()
+        $Line = "Sucesess: Bound to the $member OneDrive"
     }
     catch 
     {
-        $Line = "Error: Credentials or other binding issue"
+        $Line = "Error: Credentials or other binding issue or URL not found $OneDriveSiteName"
         WriteLine $Line $LogStream
     }
     try 
@@ -414,22 +464,24 @@ foreach ($member in $MembersToCheck)
     try 
     {
         $Context2.Web.RegionalSettings.TimeZone = $Context2.Web.RegionalSettings.TimeZones.GetbyID($TimeZone)
-        $Line = "Sucsess: Time Zone has been set to TimeZoneID $TimeZone"
+        $Line = "Sucsess: Context2 Time Zone has been set to TimeZoneID $TimeZone"
         WriteLine $Line $LogStream 
     }
     catch 
     {
-        $line = "Error: TimeZone has NOT been set to TimeZoneID $TimeZone"
+        $line = "Error: Context2 TimeZone has NOT been set to TimeZoneID $TimeZone"
         WriteLine $Line $LogStream
     }
     try 
     {
         $Context2.Web.Update()
         $Context2.ExecuteQuery()
+        $Line = "Sucsess: OneDrive Time Zone has been set to TimeZoneID $TimeZone for $member"
+        WriteLine $Line $LogStream 
     }
     catch 
     {
-        $Line = "Error:  Onedrive site not updated, unxepected this was"
+        $Line = "Error:  OneDrive Time Zone has been not set to TimeZoneID $TimeZone for $member"
         WriteLine $Line $LogStream
     }
     

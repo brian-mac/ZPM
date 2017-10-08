@@ -1,5 +1,3 @@
-<<<<<<< HEAD:TryHarness.ps1
-=======
 Function CloseGracefully()
 {
     # Close all file streams, files and sessions.
@@ -23,58 +21,61 @@ function WriteLine ($LineTxt)
     $Stream.writeline( $LineTxt )
 }
    
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
 Function UnpackDelgates ($Delegates)   
 {
     $ValidDelgates = New-Object System.Collections.ArrayList
     $delegates = $delegates.split("|")
     foreach ($Del in $delegates)
     {
-        $del= $del.trim()
+        $Del = $del.trim()
         If ($del.Contains("talent2.com") )
         {
             # We need to find the coresponding O365 account
-            $TargDel = get-mailbox | Where-Object {$_.ForwardingSmtpAddress -eq $Del} -ErrorAction SilentlyContinue
+            $TargDel = get-mailbox -Filter "$_.Forwardingsmtpaddress -eq '$del'" -ErrorAction SilentlyContinue
             If ($TargDel)
             {
                 #Found a mailbox with the T2 as a forwarding value
-<<<<<<< HEAD:TryHarness.ps1
-                 $ValidDelgates.add($TargetDel.ForwardingSmtpAddress)
-=======
                 $ValidDelgates.add($TargDel.PrimarySmtpAddress)
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
             }
             else
             {
                 #Lets try and find a recipient (Ok a contact really) with an email address of Talent2 
                 # Ok this firmly makes the assumption we are in T2 and AG not any mail enviroment
-                $TargRecp = Get-Recipient | Where-Object {$_.PrimarySmtpAddress -eq $Del} -ErrorAction SilentlyContinue
+                $TargRecp = Get-Recipient -Filter "$_.PrimarySmtpAddress -eq '$Del'" -ErrorAction SilentlyContinue
                 if ($TargRecp)
                 {
                     # Found Something.
                     If ($TargRecp.RecipientType -eq "MailContact")
                     {
                         #Yep it is a contact, Now we have to find the account this is a forwarder for
-<<<<<<< HEAD:TryHarness.ps1
-                        $ContactID = $TargRecp.id 
-                        $TargDel = get-mailbox | Where-Object {$_.ForwardinAddress -eq $ContactID} -ErrorAction SilentlyContinue
-                        If ($TargDel)
-                        {
-                            $ValidDelgates.add($TargDel.PrimarySmtpAddress)
-=======
                         $ContactID = $TargRecp.DistinguishedName
                         $TargDel = get-mailbox -Filter "$_.ForwardingAddress -eq '$ContactId'" -ErrorAction SilentlyContinue
                         If ($TargDel)
                         {
                            $ValidDelgates.add($TargDel.PrimarySmtpAddress)
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
                         }
                         else 
                         {
-                            $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del " 
-                            # Write-Line $Line
+                            # Sooo if they are already migrated the forwarding will have been removed, here comes the hail Mary
+                            $TrySamAcc = ($TargRecp.Name).split(".")
+                            $TrySamAcc = $TrySamAcc.item(0)
+                            $TargDel = get-mailbox -Identity $TrySamAcc -ErrorAction SilentlyContinue
+                            if ($TargDel)
+                            {
+                                 $ValidDelgates.add($del) 
+                            } 
+                            Else
+                            {
+                                $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del or $TrySamAcc" 
+                                WriteLine $Line
+                            }
                         }
                     } 
+                }
+                else
+                {
+                    $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del " 
+                    WriteLine $Line    
                 }
             }
         } 
@@ -89,7 +90,7 @@ Function UnpackDelgates ($Delegates)
             else
             {
                 $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del " 
-                # Write-Line $Line
+                WriteLine $Line
             }
         }
     }
@@ -97,15 +98,15 @@ Function UnpackDelgates ($Delegates)
     $ValidDelgates =$null
 }
 
-Function AddDeligations ($GoogleUPN,$O365Specific)
+Function RemoveDelegations ($GoogleUPN,$O365Specific)
 {
     #Check to see if current mailbox has a dependcey.
     
-    If ($O365Specific)
+    If ($O365Specific.Length -gt 1)
     {
         # This means there will be a discrepencey between O365 account and GoogleUPN.
         # Check for dependecies using Google UPN.
-        If ($hash[$GoogleUPN])
+        If ($hash[$GoogleUPN] )
         {
             # Mailbox delegation found, however we need to use O365 specific value to bind to O365 mailbox
             #Check mailbox existis 
@@ -120,11 +121,11 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
             else
             {
                 $Line = "Error: Could not find the Mailbox $Target, unexpected this was"
-                #WriteLine $Line    
+                WriteLine $Line    
             }
         }
     }
-    else
+    Else
     {
         If ($hash[$GoogleUPN])
         {
@@ -140,14 +141,9 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
             }
             else
             {
-<<<<<<< HEAD:TryHarness.ps1
-                $Line = "Error: Could not find the Mailbox $Target, unexpected this was"
-                #WriteLine $Line    
-=======
                 $TempName = $Target.PrimarySmtpAddress
                 $Line = "Error: Could not find the Mailbox $TempName, unexpected this was"
                 WriteLine $Line    
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
             }  
         }
     }
@@ -161,62 +157,50 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
         WriteLine
         # Loop through each delegate
         foreach ($IndividualDel in $ValidatedDeliagtes)
-<<<<<<< HEAD:TryHarness.ps1
-       {
-            if ($IndividualDel)
-=======
         {
             $IndividualDel = ($IndividualDel).tostring()
-            $IndividualDel = ($IndividualDel).Trim()
             if ($IndividualDel.contains("@"))
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
             {
                 $MailboxID = $Target.id
-                $error = $null
-                $IndividualDel = "urrgg"
                 try
                 {
-                    Invoke-Command -Session $Invsession -ScriptBlock {add-mailboxpermission -identity $Using:MailboxId  -User $Using:IndividualDel -AccessRight FullAccess} -ErrorAction Stop > $null
-                    $Line = "Sucsess: $IndividualDel added to $Target"
+                    Invoke-Command -Session $Invsession -ScriptBlock {Remove-mailboxpermission -identity $Using:MailboxId  -User $Using:IndividualDel -AccessRight FullAccess -Confirm:$false} > $null
+                    $Line = "Sucsess: $IndividualDel Removed to $Target"
                 }
                 Catch 
                 {
-                    $Line ="Error: $IndividualDel count NOT be added to $Target"
+                    $Line ="Error: $IndividualDel count NOT be Removed to $Target"
                 }
-                #writeline $Line
+                writeline $Line
                 if ($Target.IsShared)
                 {
                     try
                     {
-                        Invoke-Command -Session $Invsession -ScriptBlock {Add-RecipientPermission -identity $Using:MailboxID  -AccessRights SendAs -Trustee $Using:IndividualDel -Confirm:$false} > $Null
-                        $Line = "Sucsess: Sendas added for $IndividualDel to $Target"
+                        Invoke-Command -Session $Invsession -ScriptBlock {Remove-RecipientPermission -identity $Using:MailboxID  -AccessRights SendAs -Trustee $Using:IndividualDel -Confirm:$false} > $Null
+                        $Line = "Sucsess: Sendas removed for $IndividualDel to $Target"
                     }
                     Catch 
                     {
-                        $Line ="Error: SendAs not added for $IndividualDel to $Target"
+                        $Line ="Error: SendAs not removed for $IndividualDel to $Target"
                     }
-                    #Writeline $Line
-                    try
-                    {
-                        Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox $Using:MailboxId  -MessageCopyForSentAsEnabled $True} > $Null
-                        $Line = "Sucsess: MessageCopyForSentAsEnabled for $Target"
-                    }
-                    Catch 
-                    {
-                        $Line ="Error: MessageCopyForSentAsEnabled not set for $Target"
-                    }
-                    #Writeline $Line                
+                    Writeline $Line
+                   # try
+                    #{
+                   #     Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox $Using:MailboxId  -MessageCopyForSentAsEnabled $True} > $Null
+                    #    $Line = "Sucsess: MessageCopyForSentAsEnabled for $Target"
+                   # }
+                   # Catch 
+                   # {
+                    #    $Line ="Error: MessageCopyForSentAsEnabled not set for $Target"
+                    #}
+                    Writeline $Line                
                 }
             }
         }
     }
-<<<<<<< HEAD:TryHarness.ps1
-$DelgateFlag = $false
-=======
  $DelgateFlag = $false
- # Remove-PSSession -Session $Invsession
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
 }
+
 
 Function ConnectToO365 ()
 {
@@ -249,9 +233,6 @@ Function ConnectToO365 ()
     }
 }
 
-<<<<<<< HEAD:TryHarness.ps1
-# ConnectToO365
-=======
 
 # Main Body
 ConnectToO365
@@ -265,7 +246,7 @@ $mode       = [System.IO.FileMode]::Append
 $ModeAsia   = [System.IO.FileMode]::Create
 $access     = [System.IO.FileAccess]::Write
 $sharing    = [IO.FileShare]::Read
-$LogPath    = [System.IO.Path]::Combine("C:\temp\OMigratedT2Tasks.txt")
+$LogPath    = [System.IO.Path]::Combine("C:\temp\RemovedPermissions.txt")
 $AsiaLog    = [System.IO.Path]::Combine($Temp_Asia_log)
 
 # create the FileStream and StreamWriter objects
@@ -279,7 +260,6 @@ $Stream = New-Object System.IO.StreamWriter($fs)
 #WriteAsia $AsiaLog
 
 ConnectToO365
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
 
 $Hash=@{}
 $DependFile ="C:\Temp\dependacyreport.csv"
@@ -291,15 +271,11 @@ foreach ($dependecy in $Depends)
     $Hash.Add($DepEmail, $DepDel)
 
 }
-<<<<<<< HEAD:TryHarness.ps1
-AddDeligations "aaron.clancy@talent2.com" "Aaron.Clancy@AllegisGlobalSolutions.com"
-=======
-# AddDeligations "aaron.clancy@talent2.com" "Aaron.Clancy@AllegisGlobalSolutions.com"
+# RemoveDelegations "aaron.clancy@talent2.com" "Aaron.Clancy@AllegisGlobalSolutions.com"
 #This Loop to use this as standalone from a file, it would usually be used in code that passes one user at a time.
 foreach ($mailbox in $Depends)
 {
-    AddDeligations ($mailbox.email).trim() $null
+    RemoveDelegations ($mailbox.email).trim() $null
 }
-#AddDeligations "ss.accounts@allegisglobalsolutions.com" $null
+#RemoveDelegations "ss.accounts@allegisglobalsolutions.com" $null
 CloseGracefully
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1

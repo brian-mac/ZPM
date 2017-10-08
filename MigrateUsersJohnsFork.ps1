@@ -10,7 +10,7 @@
 *Creates an output of all Asia users C:\temp\AsiaAddToGApp.csv, this  file is used as an input for a script that runs on the Talent2Asia.com domain.
 
 .Description
-Version 4.5.3 20170912 (Johns Fork)
+Version 4.6.0 20170926 (Johns Fork)
 The script can either create act on a single user at a time or multiple users using a CSV file.
 The script has two input parameters: Target User email address and forwarding email address value.
 
@@ -36,6 +36,7 @@ To call this script in windows 10 to migrate a user DL: powershell .\MigrateUser
 [CmdletBinding (DefaultParameterSetName="Set 2")]
 param (
     [Parameter(Parametersetname = "Set 1")][String]$Inputfile , 
+    [Parameter(ParameterSetName = "Set 1")][string]$DependFile,
     [Parameter(Mandatory=$True,HelpMessage="Please enter Email Address",Parametersetname = "Set 2" )][string] $Email,
     [Parameter(Mandatory=$True,HelpMessage="Please enter Forwarding Email Address",Parametersetname = "Set 2" )][string] $O365ForwardingAddress,
     [Parameter(Mandatory=$True,HelpMessage="Please enter AGS Email Address",Parametersetname = "Set 2" )][string] $AGSEmail
@@ -57,7 +58,7 @@ Function CloseGracefully()
 }
 Function ConnectToO365 ()
 {
-    $usercredential = Get-Credential -UserName "jkontoni.admin@allegisgroup.com" -Message "Please enter:" 
+    $usercredential = Get-Credential #-UserName "jkontoni.admin@allegisgroup.com" -Message "Please enter:" 
     $PSsessions = Get-PSSession
     foreach ($PsSession in $PSsessions)
     {
@@ -76,19 +77,21 @@ Function ConnectToO365 ()
         }
         Else
         {
-           
-        } $session = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $UserCredential -Authentication Basic -AllowRedirection
+            $session = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $UserCredential -Authentication Basic -AllowRedirection 
+        } 
         Import-PSSession $session  
         If (!$session)
         {
             CloseGracefully
         }
     }
+      #Create A session specific for the invoke commands
+      $Global:Invsession = Get-PSSession  -InstanceId (Get-OrganizationConfig).RunspaceId.Guid
 }
 
 Function ConnectToExch ()
 {
-    $usercredential = Get-Credential -UserName "john.kontonis@allegisgroup.com" -Message "Please enter:" 
+    $usercredential = Get-Credential #-UserName "john.kontonis@allegisgroup.com" -Message "Please enter:" 
     $PSsessions = Get-PSSession
     foreach ($PsSession in $PSsessions)
     {
@@ -103,13 +106,14 @@ Function ConnectToExch ()
         if ($ProxyAddress.address)
         {
             $proxyOptions = New-PSSessionOption -ProxyAccessType IEConfig
-            $ExSession = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.allegisgroup.com/powershell/ -Credential $UserCredential -Authentication Basic -AllowRedirection  -SessionOption $proxyOptions
+            $Global:ExSession = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.allegisgroup.com/powershell/ -Credential $UserCredential -Authentication Basic -AllowRedirection  -SessionOption $proxyOptions
         }
         Else
         {
-           
-        } $ExSession = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.allegisgroup.com/powershell/ -Credential $UserCredential -Authentication Basic -AllowRedirection
-        Import-PSSession $ExSession  -Prefix OnPrem 
+            $Global:ExSession = new-pssession -configurationname Microsoft.exchange -ConnectionUri https://outlook.allegisgroup.com/powershell/ -Credential $UserCredential -Authentication Basic -AllowRedirection
+            
+        }  
+        Import-PSSession $ExSession  -Prefix OnPrem
         If (!$ExSession)
         {
             CloseGracefully
@@ -166,17 +170,17 @@ Function AddGroup($TargetUser,$TargetGroup)
 
 Function AddToDlist ($TargetUser, $TargetDlist)
 {
-    Add-OnpremDistributionGroupMember -Identity $TargetDlist -Member $TargetUser  -ErrorAction SilentlyContinue 
-    If ($DlError)
+    Try
+    {
+        Invoke-Command -Session $Exsession -ScriptBlock {Add-DistributionGroupMember -Identity $Using:TargetDlist -Member $Using:TargetUser} -ErrorAction Stop > $null      
+        $Line = "Sucsess: $TargetUser has been added to $TargetDlist"
+        Writeline $Line
+    }
+    Catch
     {
         $line = "Error: could not add $TargetUser into $TargetDlist"
         Writeline $line
-    }
-    else
-    {
-        $Line = "Sucsess: $TargetUser has been added to $TargetDlist"
-        Writeline $Line
-    }  
+    } 
 }
 
 function AddSigniture ($targetUser,$AGSEmail)
@@ -307,17 +311,47 @@ Function ChangeForwarding ($TargetUser, $ForwardingAddress, $AGSEmail)
                 $T2Conact = $TestUser.ForwardingAddress
             }
         }
-        Set-Mailbox -identity $TargetIdentity -ForwardingAddress  $Null
+        
+        Try
+        {
+                Set-Mailbox -identity $TargetIdentity -ForwardingAddress  $Null -ErrorAction Stop
+                $Line = "Sucsess: $targetIdentity O365 Forwarding address has been set to Null"
+                WriteLine $Line
+        }
+        catch
+        {
+            $Line = "Error: $targetIdentity O365 Forwarding address has NOT been set to Null"
+            WriteLine $Line
+        }
         if($ForwardingAddress -ne "" -and $ForwardingAddress -ne "None")
         {
-            Set-Mailbox -identity $TargetIdentity -ForwardingSmtpAddress  $ForwardingAddress
+            Try
+            {
+                Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox -identity $Using:TargetIdentity -ForwardingSmtpAddress  $Using:ForwardingAddress} -ErrorAction Stop > $null
+                $Line = "Sucsess: $TargetIdentity  O365 ForwardingSMTPAddress has been set to $ForwardingAddress."
+                WriteLine $Line
+            }
+            catch
+            {
+                $Line = "Error: $TargetIdentity  O365 ForwardingSMTPAddress has NOT been set to $ForwardingAddress."
+                WriteLine $Line
+            }
         }
         Else
         {
-            Set-Mailbox -identity $TargetIdentity -ForwardingSmtpAddress  $Null
+            Try
+            {
+                Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox -identity $Using:TargetIdentity -ForwardingSmtpAddress  $Using:null} -ErrorAction Stop > $null
+                $Line = "Sucsess: $TargetIdentity  O365 ForwardingSMTPAddress has been set to Null."
+                WriteLine $Line
+            }
+            Catch 
+            {
+                $Line = "Error: $TargetIdentity  O365 forwarding NOT has been set to Null."
+                WriteLine $Line
+            }
         }
-        $Line = "Sucsess: $TargetIdentity  O365 forwarding has been set to $ForwardingAddress."
-        WriteLine $Line
+        
         If ($T2Conact)
         {
             Remove-T2Contact $T2Conact $TargetIdentity
@@ -481,11 +515,189 @@ Function ConvertUser($TargetUser)
     $IPphone = $Null
     $Tmail = $Null
     Return $ConvertedUser
-   }
+}
+Function UnpackDelgates ($Delegates)   
+{
+    $ValidDelgates = New-Object System.Collections.ArrayList
+    $delegates = $delegates.split("|")
+    foreach ($Del in $delegates)
+    {
+        If ($del.Contains("talent2.com") )
+        {
+            # We need to find the coresponding O365 account
+            $TargDel = get-mailbox -Filter "$_.Forwardingsmtpaddress -eq '$del'" -ErrorAction SilentlyContinue
+            If ($TargDel)
+            {
+                #Found a mailbox with the T2 as a forwarding value
+                $ValidDelgates.add($TargDel.PrimarySmtpAddress)
+            }
+            else
+            {
+                #Lets try and find a recipient (Ok a contact really) with an email address of Talent2 
+                # Ok this firmly makes the assumption we are in T2 and AG not any mail enviroment
+                $TargRecp = Get-Recipient -Filter "$_.PrimarySmtpAddress -eq '$Del'" -ErrorAction SilentlyContinue
+                if ($TargRecp)
+                {
+                    # Found Something.
+                    If ($TargRecp.RecipientType -eq "MailContact")
+                    {
+                        #Yep it is a contact, Now we have to find the account this is a forwarder for
+                        $ContactID = $TargRecp.DistinguishedName
+                        $TargDel = get-mailbox -Filter "$_.ForwardingAddress -eq '$ContactId'" -ErrorAction SilentlyContinue
+                        If ($TargDel)
+                        {
+                           $ValidDelgates.add($TargDel.PrimarySmtpAddress)
+                        }
+                        else 
+                        {
+                            # Sooo if they are already migrated the forwarding will have been removed, here comes the hail Mary
+                            $TrySamAcc = ($TargRecp.Name).split(".")
+                            $TrySamAcc = $TrySamAcc.item(0)
+                            $TargDel = get-mailbox -Identity $TrySamAcc -ErrorAction SilentlyContinue
+                            if ($TargDel)
+                            {
+                                 $ValidDelgates.add($del) 
+                            } 
+                            Else
+                            {
+                                $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del or $TrySamAcc" 
+                                WriteLine $Line
+                            }
+                        }
+                    } 
+                }
+                else
+                {
+                    $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del " 
+                    WriteLine $Line    
+                }
+            }
+        } 
+        Else
+        {
+            # Check delgate exists with this (Branded) smtp address.
+            $TargDel = get-mailbox -Identity $del -ErrorAction SilentlyContinue
+            if ($TargDel)
+            {
+                 $ValidDelgates.add($del) 
+            } 
+            else
+            {
+                $Line = "Error: Unpack Delgate: Could not find a O365 mailbox for delegate of $Del " 
+                WriteLine $Line
+            }
+        }
+    }
+    Return $ValidDelgates 
+    $ValidDelgates =$null
+}
 
+Function AddDeligations ($GoogleUPN,$O365Specific)
+{
+    #Check to see if current mailbox has a dependcey.
+    
+    If ($O365Specific.Length -gt 1)
+    {
+        # This means there will be a discrepencey between O365 account and GoogleUPN.
+        # Check for dependecies using Google UPN.
+        If ($hash[$GoogleUPN] )
+        {
+            # Mailbox delegation found, however we need to use O365 specific value to bind to O365 mailbox
+            #Check mailbox existis 
+            $Line = "Checking:  Google delgation found for $GoogleUPN"
+            WriteLine $Line
+            $Target = get-mailbox -identity $O365Specific -ErrorAction SilentlyContinue
+            if ($Target)
+            {
+               $ValidatedDeliagtes = UnpackDelgates $Hash[$GoogleUPN]
+               $DelgateFlag = $true
+            }
+            else
+            {
+                $Line = "Error: Could not find the Mailbox $Target, unexpected this was"
+                WriteLine $Line    
+            }
+        }
+    }
+    Else
+    {
+        If ($hash[$GoogleUPN])
+        {
+            # Mailbox delegation found
+            #Check mailbox existis 
+            $Line = "Checking:  Google Delgation Found for $GoogleUPN"
+            WriteLine $Line
+            $Target = get-mailbox -identity $GoogleUPN -ErrorAction SilentlyContinue    
+            if ($Target)
+            {
+                $ValidatedDeliagtes = UnpackDelgates $Hash[$GoogleUPN]
+                $DelgateFlag = $true
+            }
+            else
+            {
+                $TempName = $Target.PrimarySmtpAddress
+                $Line = "Error: Could not find the Mailbox $TempName, unexpected this was"
+                WriteLine $Line    
+            }  
+        }
+    }
+    # add permissions , check type of mailbox shared = send as  
+    if ($DelgateFlag)
+    {
+        #Create A session specific for the invoke commands
+        $Invsession = Get-PSSession -InstanceId (Get-OrganizationConfig).RunspaceId.Guid
+        $TargName = $Target.name
+        $Line = "Checking:  Valid delgates found for $TargName "
+        WriteLine
+        # Loop through each delegate
+        foreach ($IndividualDel in $ValidatedDeliagtes)
+        {
+            $IndividualDel = ($IndividualDel).tostring()
+            if ($IndividualDel.contains("@"))
+            {
+                $MailboxID = $Target.id
+                try
+                {
+                    Invoke-Command -Session $Invsession -ScriptBlock {add-mailboxpermission -identity $Using:MailboxId  -User $Using:IndividualDel -AccessRight FullAccess} -ErrorAction Stop > $null
+                    $Line = "Sucsess: $IndividualDel added to $Target"
+                }
+                Catch 
+                {
+                    $Line ="Error: $IndividualDel count NOT be added to $Target"
+                }
+                writeline $Line
+                if ($Target.IsShared)
+                {
+                    try
+                    {
+                        Invoke-Command -Session $Invsession -ScriptBlock {Add-RecipientPermission -identity $Using:MailboxID  -AccessRights SendAs -Trustee $Using:IndividualDel -Confirm:$false} -ErrorAction Stop > $Null
+                        $Line = "Sucsess: Sendas added for $IndividualDel to $Target"
+                    }
+                    Catch 
+                    {
+                        $Line ="Error: SendAs not added for $IndividualDel to $Target"
+                    }
+                    Writeline $Line
+                    try
+                    {
+                        Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox $Using:MailboxId  -MessageCopyForSentAsEnabled $True} -ErrorAction Stop > $Null
+                        $Line = "Sucsess: MessageCopyForSentAsEnabled for $Target"
+                    }
+                    Catch 
+                    {
+                        $Line ="Error: MessageCopyForSentAsEnabled not set for $Target"
+                    }
+                    Writeline $Line                
+                }
+            }
+        }
+    }
+ $DelgateFlag = $false
+}
 Function ProcessUser($MigratedUser, $ForwardingAddress, $AGSEmail)
 {
-    #get-aduser  find any gaaps groups, removegapps them,   add the right gaap group
+    # Check and Modify Talent2.corp objects and properties
+    # Check there are not multiple AD Objects with this smtp address.
     Try 
     {
         $UserEmail = $MigratedUser
@@ -518,6 +730,7 @@ Function ProcessUser($MigratedUser, $ForwardingAddress, $AGSEmail)
         WriteLine $Error
         Return 
     }
+    AddDeligations $TargetUser.Mail $AGSEmail
     AddGroup $TargetUser $Gaap
     # Check to see if user existis in an OU that equates to a talent2asia.com domain.
     $Disname = $TargetUser.DistinguishedName
@@ -559,8 +772,10 @@ Function ProcessUser($MigratedUser, $ForwardingAddress, $AGSEmail)
             WriteLine $Line
         }
      }       
+    # Call functions for O365 and Exchange Online Objects and properties.
     ChangeForwarding $TargetUser $ForwardingAddress $AGSEmail
     AddSigniture $TargetUser $AGSEmail
+    
 
     $AGSEmail = $null
     $ForwardingAddress = $null
@@ -597,6 +812,16 @@ ConnectToO365
 CheckandImportModule "ActiveDirectory" 
 #Test the inputfile
 $Inputfile = "C:\temp\test.csv"
+#$DependFile ="C:\temp\dependacyreport.csv"
+# Load dependcey file as a has table for quick searching.
+$Hash=@{}
+$DependFile ="C:\Temp\dependacyreport.csv"
+$Depends =import-csv -Path $DependFile
+foreach ($dependecy in $Depends)
+{
+    $Hash.Add($dependecy.email, $dependecy.'Inbox Delegated To')
+}
+
 if ($inputfile.Length -ne 0)
 {
     $SMigratedUsersT2 = import-csv -Path $Inputfile
