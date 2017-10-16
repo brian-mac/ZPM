@@ -1,6 +1,10 @@
 {
     "version": "0.2.0",
     "configurations": [
+<<<<<<< HEAD
+        
+=======
+>>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0
         {
             "type": "PowerShell",
             "request": "launch",
