@@ -1,5 +1,3 @@
-<<<<<<< HEAD:TryHarness.ps1
-=======
 Function CloseGracefully()
 {
     # Close all file streams, files and sessions.
@@ -23,7 +21,6 @@ function WriteLine ($LineTxt)
     $Stream.writeline( $LineTxt )
 }
    
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
 Function UnpackDelgates ($Delegates)   
 {
     $ValidDelgates = New-Object System.Collections.ArrayList
@@ -38,11 +35,7 @@ Function UnpackDelgates ($Delegates)
             If ($TargDel)
             {
                 #Found a mailbox with the T2 as a forwarding value
-<<<<<<< HEAD:TryHarness.ps1
-                 $ValidDelgates.add($TargetDel.ForwardingSmtpAddress)
-=======
                 $ValidDelgates.add($TargDel.PrimarySmtpAddress)
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
             }
             else
             {
@@ -55,19 +48,11 @@ Function UnpackDelgates ($Delegates)
                     If ($TargRecp.RecipientType -eq "MailContact")
                     {
                         #Yep it is a contact, Now we have to find the account this is a forwarder for
-<<<<<<< HEAD:TryHarness.ps1
-                        $ContactID = $TargRecp.id 
-                        $TargDel = get-mailbox | Where-Object {$_.ForwardinAddress -eq $ContactID} -ErrorAction SilentlyContinue
-                        If ($TargDel)
-                        {
-                            $ValidDelgates.add($TargDel.PrimarySmtpAddress)
-=======
                         $ContactID = $TargRecp.DistinguishedName
                         $TargDel = get-mailbox -Filter "$_.ForwardingAddress -eq '$ContactId'" -ErrorAction SilentlyContinue
                         If ($TargDel)
                         {
                            $ValidDelgates.add($TargDel.PrimarySmtpAddress)
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
                         }
                         else 
                         {
@@ -140,14 +125,9 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
             }
             else
             {
-<<<<<<< HEAD:TryHarness.ps1
-                $Line = "Error: Could not find the Mailbox $Target, unexpected this was"
-                #WriteLine $Line    
-=======
                 $TempName = $Target.PrimarySmtpAddress
                 $Line = "Error: Could not find the Mailbox $TempName, unexpected this was"
                 WriteLine $Line    
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
             }  
         }
     }
@@ -161,15 +141,10 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
         WriteLine
         # Loop through each delegate
         foreach ($IndividualDel in $ValidatedDeliagtes)
-<<<<<<< HEAD:TryHarness.ps1
-       {
-            if ($IndividualDel)
-=======
         {
             $IndividualDel = ($IndividualDel).tostring()
             $IndividualDel = ($IndividualDel).Trim()
             if ($IndividualDel.contains("@"))
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
             {
                 $MailboxID = $Target.id
                 $error = $null
@@ -210,12 +185,8 @@ Function AddDeligations ($GoogleUPN,$O365Specific)
             }
         }
     }
-<<<<<<< HEAD:TryHarness.ps1
-$DelgateFlag = $false
-=======
  $DelgateFlag = $false
  # Remove-PSSession -Session $Invsession
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
 }
 
 Function ConnectToO365 ()
@@ -249,9 +220,6 @@ Function ConnectToO365 ()
     }
 }
 
-<<<<<<< HEAD:TryHarness.ps1
-# ConnectToO365
-=======
 
 # Main Body
 ConnectToO365
@@ -279,7 +247,6 @@ $Stream = New-Object System.IO.StreamWriter($fs)
 #WriteAsia $AsiaLog
 
 ConnectToO365
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
 
 $Hash=@{}
 $DependFile ="C:\Temp\dependacyreport.csv"
@@ -291,9 +258,6 @@ foreach ($dependecy in $Depends)
     $Hash.Add($DepEmail, $DepDel)
 
 }
-<<<<<<< HEAD:TryHarness.ps1
-AddDeligations "aaron.clancy@talent2.com" "Aaron.Clancy@AllegisGlobalSolutions.com"
-=======
 # AddDeligations "aaron.clancy@talent2.com" "Aaron.Clancy@AllegisGlobalSolutions.com"
 #This Loop to use this as standalone from a file, it would usually be used in code that passes one user at a time.
 foreach ($mailbox in $Depends)
@@ -302,4 +266,3 @@ foreach ($mailbox in $Depends)
 }
 #AddDeligations "ss.accounts@allegisglobalsolutions.com" $null
 CloseGracefully
->>>>>>> c6e92446406a0f26386bad7b27d8705c26a754c0:hashHarness1.ps1
