@@ -78,6 +78,7 @@ function CheckandImportModule ($ModuleName)
     }
 }
 Function ProcessUser($MigratedUser, $SamAccountName)
+
 {
     #get-aduser  find any gaaps groups, removegapps them,   add the right gaap group
     Try 
