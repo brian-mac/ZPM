@@ -27,9 +27,9 @@ To call this script in windows 10 to migrate a user DL: powershell .\AddAsiatoGa
 #>
 [CmdletBinding (DefaultParameterSetName="Set 2")]
  param (
-    [Parameter(Parametersetname = "Set 1")][String]$Inputfile , 
-    [Parameter(Mandatory=$True,HelpMessage="Please enter Email Address",Parametersetname = "Set 2" )][string] $Email,
-    [Parameter(Mandatory=$True,HelpMessage="Please enter SamAccountName",Parametersetname = "Set 2" )][string] $SamAccountName
+    [Parameter(Parametersetname = "Set 1")][String]$Inputfile #, 
+    #[Parameter(Mandatory=$True,HelpMessage="Please enter Email Address",Parametersetname = "Set 2" )][string] $Email,
+    #[Parameter(Mandatory=$True,HelpMessage="Please enter SamAccountName",Parametersetname = "Set 2" )][string] $SamAccountName
  )
 Function CloseGracefully()
 {
@@ -42,9 +42,9 @@ Function CloseGracefully()
 }
 function WriteLine ($LineTxt) 
 {
-    $Date = get-date -Format G
-    $Date = $Date + "    : "  
-    $LineTxt = $date + $LineTxt  
+    #$Date = get-date -Format G
+    #$Date = $Date + "    : "  
+    #$LineTxt = $date + $LineTxt  
     $Stream.writeline( $LineTxt )
 }
 Function AddGroup($TargetUser,$TargetGroup)
@@ -57,7 +57,8 @@ Function AddGroup($TargetUser,$TargetGroup)
     }
     Catch
     {
-        $line = "Error could not add $TargetUser into $TargetGroup"
+        $Message = ($_.Exception.Message).ToString()
+        $line = $TargetUser.name  + "  " + $Message 
         Writeline $line
     }
 }
@@ -77,51 +78,119 @@ function CheckandImportModule ($ModuleName)
         Import-Module $ModuleName
     }
 }
-Function ProcessUser($MigratedUser, $SamAccountName)
+Function Check_Object ( $TargetUser)
+{
+    $TargetUser = get-adobject -Filter {mail -eq $MigratedUser} -Properties *
+    If ($TargetUser) 
+    {
+        AddGroup $TargetUser $Gaap
+    }
+    else
+    {
+        $MigratedUser = $MigratedUser.split("@").item(0)
+        $MigratedUser = $MigratedUser + "@talent2.com"
+        $TargetUser = get-adobject -Filter {mail -eq $MigratedUser} -Properties *
+        If ($TargetUser) 
+        {
+            AddGroup $TargetUser $Gaap
+        }
+        else
+        {
+            $SAM = $MigratedUser.split("@").item(0)
+            $TargetUser = get-adobject -Filter {SamAccountName -eq $SAM} -Properties *
+            If ($TargetUser) 
+            {
+                AddGroup $TargetUser $Gaap
+            }
+            else
+            {
+                $Error = "$Sam Does not exist, please check SamAccountName $SamAccountName"
+                WriteLine $Error
+            }   
+        }
+    }
+}
+Function ProcessUser($MigratedUser, $CriteriaFlag)
 
 {
     #get-aduser  find any gaaps groups, removegapps them,   add the right gaap group
-    Try 
-        {
-            $TargetUser = get-aduser -identity $SamAccountName #-Filter {Emailaddress -eq $UserEmail} -Properties *
-        }       
-    Catch 
+    if ($CriteriaFlag -ne 2)
     {
-        $Error = "$MigratedUser Does not exist, please check SamAccountName $SamAccountName"
-        WriteLine $Error
+        $TargetUser = get-adobject -Filter {mail -eq $MigratedUser} -Properties * -erroraction stop #get-aduser -Filter {Emailaddress -eq $UserEmail} -Properties *  
     }
-    AddGroup $TargetUser $Gaap 
-    
+    Else
+    {
+        $TargetUser = Get-aduser $MigratedUser
+    }
+    If ($TargetUser) 
+    {
+        $Cast = $TargetUser.gettype()
+        if ($Cast.basetype.name -eq "ADentity" -or $Cast.basetype.name -eq "ADAccount")
+        {
+            # We have found a valid user 
+            AddGroup $TargetUser $Gaap    
+        } 
+        else
+        {
+            foreach ($TargUser in $TargetUser) # ($i=0; $i -le $targetuser.count(); $i++)
+            {
+                ProcessUser $TargUser.name  
+            }
+        }
+    }
+    else
+    {
+        if ($CriteriaFlag -eq 0)
+        {   $MigratedUser = $MigratedUser.split("@").item(0)
+            $MigratedUser = $MigratedUser + "@talent2.com"
+        }
+        if ($CriteriaFlag -eq 1)
+        {
+            $MigratedUser = $MigratedUser.split("@").item(0)
+        }
+        $CriteriaFlag++
+        if ($CriteriaFlag -lt 3)
+        {
+            ProcessUser $MigratedUser $CriteriaFlag
+        }
+        else
+        {
+            $Error = "$MigratedUser Does not exist, please check SamAccountName $SamAccountName"
+            WriteLine $Error
+        }    
+    }   
 }
 # Create Log file stream
 $mode = [System.IO.FileMode]::Append
 $access = [System.IO.FileAccess]::Write
 $sharing = [IO.FileShare]::Read
-$LogPath = [System.IO.Path]::Combine("C:\temp\OMigratedT2Tasks.txt")
+$LogPath = [System.IO.Path]::Combine("C:\temp\AddGroups.csv")
 
 
 # create the FileStream and StreamWriter objects
 $fs = New-Object IO.FileStream($LogPath, $mode, $access, $sharing)
 $Stream = New-Object System.IO.StreamWriter($fs)
 
+WriteLine "Status"
 #Set Target Group
 $Gaap = "APAC-Migrated-Gapps"
 
-CheckandImportModule "ActiveDirectory"
-
+# CheckandImportModule "ActiveDirectory"
+$Inputfile = "C:\temp\MigrationUsers.csv"
 if ($inputfile.Length -ne 0)
 {
     $SMigratedUsersT2 = import-csv -Path $Inputfile
     foreach ($MigratedUser in $SMigratedUsersT2)
     {
-        $SamAccountName = $MigratedUser.SamAccountName 
-        $O365User = $MigratedUser.Emailaddress
-        ProcessUser $O365User $SamAccountName
+        #$SamAccountName = $MigratedUser.SamAccountName 
+        $O365User = $MigratedUser.SourceEmail
+        ProcessUser $O365User 0
+        $Stream.flush()
     }
 }
 else
 {
-    ProcessUser $email $SamAccountName
+    ProcessUser $email 0
 }
 
 #Close and write stream to file
