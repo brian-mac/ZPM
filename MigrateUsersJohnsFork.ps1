@@ -314,6 +314,24 @@ Function ChangeForwarding ($TargetUser, $ForwardingAddress, $AGSEmail)
         
         Try
         {
+            $TryCount = 0
+            $SucsessFlag = $False 
+            $TargetMailbox = $Null
+            while ($TryCount -lt 4 -and $SucsessFlag -eq $False) 
+            {
+                Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox -identity $Using:TargetIdentity -ForwardingSmtpAddress  $Using:ForwardingAddress} -ErrorAction Stop
+                $TargetMailbox = get-mailbox $TargetIdentity
+                If ($TargetMailbox.ForwardingAddress -ne $null)
+                {
+                    $TryCount++
+                    $Line = "Error: $TargetIdentity  O365 ForwardingSMTPAddress has NOT been set to $ForwardingAddress. Try $TryCount"
+                }
+                else
+                {
+                    $SucsessFlag = $True
+                    $Line = "Sucsess: $TargetIdentity  O365 ForwardingSMTPAddress has been set to $ForwardingAddress."
+                    WriteLine $Line 
+                }   
                 Set-Mailbox -identity $TargetIdentity -ForwardingAddress  $Null -ErrorAction Stop
                 $Line = "Sucsess: $targetIdentity O365 Forwarding address has been set to Null"
                 WriteLine $Line
@@ -327,22 +345,38 @@ Function ChangeForwarding ($TargetUser, $ForwardingAddress, $AGSEmail)
         {
             Try
             {
-                Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox -identity $Using:TargetIdentity -ForwardingSmtpAddress  $Using:ForwardingAddress} -ErrorAction Stop > $null
-                $Line = "Sucsess: $TargetIdentity  O365 ForwardingSMTPAddress has been set to $ForwardingAddress."
-                WriteLine $Line
-            }
+                $TryCount = 0
+                $SucsessFlag = $False 
+                $TargetMailbox = $Null
+                while ($TryCount -lt 4 -and $SucsessFlag -eq $False) 
+                {
+                    Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox -identity $Using:TargetIdentity -ForwardingSmtpAddress  $Using:ForwardingAddress} -ErrorAction Stop
+                    $TargetMailbox = get-mailbox $TargetIdentity
+                    If ($TargetMailbox.ForwardingAddress -ne $null)
+                    {
+                        $TryCount++
+                        $Line = "Error: $TargetIdentity  O365 ForwardingSMTPAddress has NOT been set to $ForwardingAddress. Try $TryCount"
+                    }
+                    else
+                    {
+                        $SucsessFlag = $True
+                        $Line = "Sucsess: $TargetIdentity  O365 ForwardingSMTPAddress has been set to $ForwardingAddress."
+                        WriteLine $Line 
+                    }   
+                }
             catch
             {
                 $Line = "Error: $TargetIdentity  O365 ForwardingSMTPAddress has NOT been set to $ForwardingAddress."
                 WriteLine $Line
             }
-        }
         Else
         {
             Try
             {
-                Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox -identity $Using:TargetIdentity -ForwardingSmtpAddress  $Using:null} -ErrorAction Stop > $null
-                $Line = "Sucsess: $TargetIdentity  O365 ForwardingSMTPAddress has been set to Null."
+               
+               
+                Invoke-Command -Session $Invsession -ScriptBlock {Set-Mailbox -identity $Using:TargetIdentity -ForwardingSmtpAddress  $Using:null} -ErrorAction Stop 
+                 $Line = "Sucsess: $TargetIdentity  O365 ForwardingSMTPAddress has been set to Null."
                 WriteLine $Line
             }
             Catch 
