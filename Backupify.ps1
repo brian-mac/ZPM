@@ -46,53 +46,76 @@ Function CloseGracefully($Stream,$FileSystem)
     $error.clear()
     #Exit
 }
+
+function Convert-DateString ([String]$Date, [String[]]$Format)
+{
+   $result = New-Object DateTime
+ 
+   $convertible = [DateTime]::TryParseExact(
+      $Date,
+      $Format,
+      [System.Globalization.CultureInfo]::InvariantCulture,
+      [System.Globalization.DateTimeStyles]::None,
+      [ref]$result)
+ 
+   if ($convertible) { $result }
+}
 Function AddGroup($TargetUser,$TargetGroup)
 {
     Try
     {
         Add-ADGroupMember -Identity $TargetGroup -Members $TargetUser
-        $Line = "$TargetUser has been added to $TargetGroup"
+        $Line = $TargetUser.Name + " has been added to " +  $TargetGroup
         WriteLog $Line $LogStream
+        $LogStream.Flush()
     }
     Catch
     {
         $Message = ($_.Exception.Message).ToString()
         $Errorline = $TargetUser.name  + "  " + $Message 
         WriteLog $Errorline $LogStream
+        $LogStream.Flush()
     }
-    if ($targetuser.objecttype -eq "user")
+    $ToDate = (get-date).tostring()
+    if ($targetuser.objectclass -eq "user")
     {
-        Set-aduser $TargetUser -exstentionsattribute10 = Get-Date
+        Set-aduser $TargetUser -replace @{'extensionAttribute10'=$ToDate}
     }
-    elseif (condition) 
+    elseif ($targetuser.objectclass -eq "contact") 
     {
-       Set-adobject $TargetUser -exstentionsattribute10 Get-Date     
+       Set-adobject $TargetUser -replace @{'extensionAttribute10'=$ToDate}    
     }
-    Return $Line
+    Return $line
 }
 
-Function CompletePreviousAccounts ($EnableGroup, $TargetDate)
+Function CompletePreviousAccounts ($EnableGroup, $tProcessedGroup, $TargetDate)
 {
-    $CurrentMembers = Get-ADGroupMember $EnableGroup 
+    $CurrentMembers = Get-ADGroupMember $EnableGroup      
     foreach ($CurrentMember in $CurrentMembers)
     {
-        if ( $CurrentMember.ExtenstionAttrinbute10 -le $TargetDate)
+        $CurrentObj = Get-ADObject $CurrentMember -Properties extensionAttribute10 , Memberof
+        $EX10 = $CurrentObj.extensionAttribute10
+        $ObjectDate = $Ex10  | get-date  #Convert-DateString $EX10 "dd/MM/yyyy hh:mm:ss tt"
+        # $ObjectDate = "20/11/2017" | get-date
+        if ( $ObjectDate -le $TargetDate -And (!$CurrentObj.memberof.contains($tProcessedGroup)))
         {
-            Addgroup $CurrentMember $ProcessedGroup
+            Addgroup $CurrentMember $ProcessedGroup 
             $ProcessedUsersCounter++ 
-            $LogLine = "$CurrentMember.Name has been added to $EnableGroup"
+            $LogLine = $CurrentMember.Name + " has been added to: " +  $EnableGroup
             WriteLog $LogLine $LogStream
+            $LogStream.Flush()
         }
     }
     Return $ProcessedUsersCounter
 }
 # open a log file
-$LogFile = CreateFile "C:\temp\CheckSynch.csv" "Create"
+$LogFile = CreateFile "C:\temp\BackUpIfy.log" "Create"
 $LogStream = New-Object System.IO.StreamWriter($LogFile)
 
 $TargetOu = "OU=Disabled Accounts,DC=talent2,DC=corp"
 $EnableGroup = "BackupifyTemp-GApps"
 $ProcessedGroup = "BackupifyComplete-GApps"
+$ProGroupDN = "CN=BackupifyComplete-Gapps,OU=Google Sync Groups,OU=Talent2 Security Groups,DC=talent2,DC=corp"
 
 $addedToBackupifyCounter = 0
 $IterationCounter = 0
@@ -100,29 +123,30 @@ $TargetDate = get-date
 $TargetDate = $TargetDate.addhours(-72)
 
 # {} find users who are already in $EnableGroup
-$AmountOfUsersToProcess = CompletePreviousAccounts $enableGroup $TargetDate
-$AmountOfUsersToProcess =1 # test code
+$AmountOfUsersToProcess = CompletePreviousAccounts $enableGroup $ProGroupDN $TargetDate
+$AmountOfUsersToProcess = $AmountOfUsersToProcess.item(($AmountOfUsersToProcess.count)-1)
+$AmountOfUsersToProcess = 9 # test code
 
 # for each user  {AddGroup, $Processed-GoogleApps}  çheck object versus User
-$DisableObjects = get-adobject -filter * -SearchBase $TargetOu -Properties *
+$DisableObjects = get-adobject -filter * -SearchBase $TargetOu -Properties extensionAttribute10
 while ($addedToBackupifyCounter -le $AmountOfUsersToProcess)
 {
-    $DisabledObject = $DisableObjects.item($IterationCounter)
     $IterationCounter++
+    $DisabledObject = $DisableObjects.item($IterationCounter)
     If ( !($DisabledObject.memberof).contains($ProcessedGroup))
     {
-     $GroupReturnValue =   AddGroup $DisabledObject $EnableGroup
-    If ($GroupReturnValue)
-    {
-        $addedToBackupifyCounter++
-    }
+        $GroupReturnValue =   AddGroup $DisabledObject $EnableGroup
+        If ($GroupReturnValue)
+        {
+            $addedToBackupifyCounter++
+        }
     }
 }
 # Find all users in target OU that are not in $processed-GoogleApps
 # Loop until  $ProcessedCounter = 500
 #  {AddGroup, $#EnableGroup}
 # increment counter
-# #close
+CloseGracefully $LogStream $logfile 
 
 
 
