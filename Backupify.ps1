@@ -115,8 +115,8 @@ $LogStream = New-Object System.IO.StreamWriter($LogFile)
 $TargetOu = "OU=Disabled Accounts,DC=talent2,DC=corp"
 $EnableGroup = "BackupifyTemp-GApps"
 $ProcessedGroup = "BackupifyComplete-GApps"
-$ProGroupDN = "CN=BackupifyComplete-Gapps,OU=Google Sync Groups,OU=Talent2 Security Groups,DC=talent2,DC=corp"
-
+$ProGroupDN = get-adgroup "CN=BackupifyComplete-Gapps,OU=Google Sync Groups,OU=Talent2 Security Groups,DC=talent2,DC=corp"
+$EnableGroupDN = get-adgroup "CN=BackupifyTemp-GApps,OU=Google Sync Groups,OU=Talent2 Security Groups,DC=talent2,DC=corp"
 $addedToBackupifyCounter = 0
 $IterationCounter = 0
 $TargetDate = get-date 
@@ -128,19 +128,19 @@ $AmountOfUsersToProcess = $AmountOfUsersToProcess.item(($AmountOfUsersToProcess.
 $AmountOfUsersToProcess = 9 # test code
 
 # for each user  {AddGroup, $Processed-GoogleApps}  çheck object versus User
-$DisableObjects = get-adobject -filter * -SearchBase $TargetOu -Properties extensionAttribute10
+$DisableObjects = get-adobject -filter {objectclass -eq "user" -or objectclass -eq "contact"} -SearchBase $TargetOu -Properties extensionAttribute10 , Memberof | Where{($_.memberof -notcontains $ProGroupDN.DistinguishedName) -and ($_.memberof -notcontains $EnableGroupDN.DistinguishedName)} 
 while ($addedToBackupifyCounter -le $AmountOfUsersToProcess)
 {
     $IterationCounter++
     $DisabledObject = $DisableObjects.item($IterationCounter)
-    If ( !($DisabledObject.memberof).contains($ProcessedGroup))
-    {
+    #If ( (!$DisabledObject.memberof.contains($ProGroupDN)) -or (!$DisabledObject.memberof.contains($ProGroupDN)))
+    #{
         $GroupReturnValue =   AddGroup $DisabledObject $EnableGroup
         If ($GroupReturnValue)
         {
             $addedToBackupifyCounter++
         }
-    }
+    #}
 }
 # Find all users in target OU that are not in $processed-GoogleApps
 # Loop until  $ProcessedCounter = 500
