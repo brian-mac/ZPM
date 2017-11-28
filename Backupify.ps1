@@ -99,7 +99,7 @@ Function CompletePreviousAccounts ($EnableGroup, $tProcessedGroup, $TargetDate)
         # $ObjectDate = "20/11/2017" | get-date
         if ( $ObjectDate -le $TargetDate -And (!$CurrentObj.memberof.contains($tProcessedGroup)))
         {
-            Addgroup $CurrentMember $ProcessedGroup 
+            Addgroup $CurrentMember $tProcessedGroup 
             $ProcessedUsersCounter++ 
             $LogLine = $CurrentMember.Name + " has been added to: " +  $EnableGroup
             WriteLog $LogLine $LogStream
@@ -125,10 +125,10 @@ $TargetDate = $TargetDate.addhours(-72)
 # {} find users who are already in $EnableGroup
 $AmountOfUsersToProcess = CompletePreviousAccounts $enableGroup $ProGroupDN $TargetDate
 $AmountOfUsersToProcess = $AmountOfUsersToProcess.item(($AmountOfUsersToProcess.count)-1)
-$AmountOfUsersToProcess = 9 # test code
+#$AmountOfUsersToProcess = 9 # test code
 
 # for each user  {AddGroup, $Processed-GoogleApps}  çheck object versus User
-$DisableObjects = get-adobject -filter {objectclass -eq "user" -or objectclass -eq "contact"} -SearchBase $TargetOu -Properties extensionAttribute10 , Memberof | Where{($_.memberof -notcontains $ProGroupDN.DistinguishedName) -and ($_.memberof -notcontains $EnableGroupDN.DistinguishedName)} 
+$DisableObjects = get-adobject -filter {objectclass -eq "user" -or objectclass -eq "contact"} -SearchBase $TargetOu -Properties extensionAttribute10 , Memberof | Where-object{($_.memberof -notcontains $ProGroupDN.DistinguishedName) -and ($_.memberof -notcontains $EnableGroupDN.DistinguishedName)} 
 while ($addedToBackupifyCounter -le $AmountOfUsersToProcess)
 {
     $IterationCounter++
