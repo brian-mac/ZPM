@@ -101,9 +101,9 @@ Function CompletePreviousAccounts ($EnableGroup, $tProcessedGroup, $TargetDate)
         {
             Addgroup $CurrentMember $tProcessedGroup 
             $ProcessedUsersCounter++ 
-            $LogLine = $CurrentMember.Name + " has been added to: " +  $EnableGroup
-            WriteLog $LogLine $LogStream
-            $LogStream.Flush()
+            #$LogLine = $CurrentMember.Name + " has been added to: " +  $EnableGroup
+            #WriteLog $LogLine $LogStream
+            #$LogStream.Flush()
         }
     }
     Return $ProcessedUsersCounter
