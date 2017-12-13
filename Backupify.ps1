@@ -97,7 +97,7 @@ Function CompletePreviousAccounts ($EnableGroup, $tProcessedGroup, $TargetDate)
         $EX10 = $CurrentObj.extensionAttribute10
         $ObjectDate = $Ex10  | get-date  #Convert-DateString $EX10 "dd/MM/yyyy hh:mm:ss tt"
         # $ObjectDate = "20/11/2017" | get-date
-        if ( $ObjectDate -le $TargetDate -And (!$CurrentObj.memberof.contains($tProcessedGroup)))
+        if ( $ObjectDate -le $TargetDate -And (!$CurrentObj.memberof.contains($tProcessedGroup.DistinguishedName)))
         {
             Addgroup $CurrentMember $tProcessedGroup 
             $ProcessedUsersCounter++ 
@@ -125,7 +125,7 @@ $TargetDate = $TargetDate.addhours(-72)
 # {} find users who are already in $EnableGroup
 $AmountOfUsersToProcess = CompletePreviousAccounts $enableGroup $ProGroupDN $TargetDate
 $AmountOfUsersToProcess = $AmountOfUsersToProcess.item(($AmountOfUsersToProcess.count)-1)
-#$AmountOfUsersToProcess = 9 # test code
+# $AmountOfUsersToProcess = 180 # test code
 
 # for each user  {AddGroup, $Processed-GoogleApps}  çheck object versus User
 $DisableObjects = get-adobject -filter {objectclass -eq "user" -or objectclass -eq "contact"} -SearchBase $TargetOu -Properties extensionAttribute10 , Memberof | Where-object{($_.memberof -notcontains $ProGroupDN.DistinguishedName) -and ($_.memberof -notcontains $EnableGroupDN.DistinguishedName)} 
