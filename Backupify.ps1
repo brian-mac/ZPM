@@ -64,15 +64,22 @@ Function AddGroup($TargetUser,$TargetGroup)
 {
     Try
     {
-        Add-ADGroupMember -Identity $TargetGroup -Members $TargetUser
-        $Line = $TargetUser.Name + " has been added to " +  $TargetGroup
+        if ($targetuser.objectclass -eq "contact")
+        {
+            Set-ADGroup -Identity $targetgroup -Add @{'member'=$targetuser.DistinguishedName}
+        }
+        Else 
+        {
+            Add-ADGroupMember -Identity $TargetGroup -Members $TargetUser.DistinguishedName
+        }
+        $Line = "Sucsess:" + $TargetUser.Name + " has been added to " +  $TargetGroup
         WriteLog $Line $LogStream
         $LogStream.Flush()
     }
     Catch
     {
         $Message = ($_.Exception.Message).ToString()
-        $Errorline = $TargetUser.name  + "  " + $Message 
+        $Errorline = "Error:" + $TargetUser.name  + "  " + $Message 
         WriteLog $Errorline $LogStream
         $LogStream.Flush()
     }
@@ -125,7 +132,7 @@ $TargetDate = $TargetDate.addhours(-72)
 # {} find users who are already in $EnableGroup
 $AmountOfUsersToProcess = CompletePreviousAccounts $enableGroup $ProGroupDN $TargetDate
 $AmountOfUsersToProcess = $AmountOfUsersToProcess.item(($AmountOfUsersToProcess.count)-1)
-# $AmountOfUsersToProcess = 180 # test code
+ # $AmountOfUsersToProcess = 530 # test code
 
 # for each user  {AddGroup, $Processed-GoogleApps}  çheck object versus User
 $DisableObjects = get-adobject -filter {objectclass -eq "user" -or objectclass -eq "contact"} -SearchBase $TargetOu -Properties extensionAttribute10 , Memberof | Where-object{($_.memberof -notcontains $ProGroupDN.DistinguishedName) -and ($_.memberof -notcontains $EnableGroupDN.DistinguishedName)} 
