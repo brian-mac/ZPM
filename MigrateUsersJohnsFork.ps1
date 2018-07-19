@@ -50,7 +50,6 @@ Function CloseGracefully()
     $fs.Close()
     $StreamAsia.close()
     $fsAsia.close()
-    
     # Close PS Sessions
     Get-PSSession | Remove-PSSession
     $error.clear()
