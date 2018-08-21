@@ -8,11 +8,18 @@ $writer.AutoFlush = $true
 
 $buffer = new-object System.Byte[] 1024
 $encoding = new-object System.Text.AsciiEncoding 
+# Record start <STX> Record end <ETX>
+# [char]$STX = [char]2
+# [char]$eTX = [char]3
+#OR
+[byte]$STX = 0x02
+[byte]$ETX = 0x03
 
 if ($tcpConnection.Connected)
 {
-    $command = '<LinkDescription Date="070818" Time="190649" VerNum="1.0" />'
+    $command = $STX + '<LinkDescription Date="070818" Time="190649" VerNum="1.0" />' + $ETX
     $writer.WriteLine($command) | Out-Null
+    $writer.Flush()
     start-sleep -Milliseconds 900
     while ($tcpStream.DataAvailable)
     {
@@ -22,7 +29,7 @@ if ($tcpConnection.Connected)
     if ($response -contains "LinkAlive Date")
     {
         Write-Host "Link Alive received " + $response
-        $command = '<PostInquiry InquiryInformation="M" MaximumReturnedMatches="16" SequenceNumber="1235" RequestType="8" PaymentMethod="16" Date="070905" Time="194121" RevenueCenter="1" WaiterId="Waiter1" WorkstationId="POS1" />'
+        $command = $STX +'<PostInquiry InquiryInformation="M" MaximumReturnedMatches="16" SequenceNumber="1235" RequestType="8" PaymentMethod="16" Date="070905" Time="194121" RevenueCenter="1" WaiterId="Waiter1" WorkstationId="POS1" />' + $ETX
         $writer.WriteLine($command) | Out-Null
         start-sleep -Milliseconds 3000
         while ($tcpStream.DataAvailable)
