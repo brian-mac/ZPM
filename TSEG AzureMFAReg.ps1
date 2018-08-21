@@ -48,8 +48,9 @@ $DataLine = "UPN,StrongAuth,Status"
 WriteData $DataLine $OutPutStream
 $G = Get-MsolGroup -SearchString "DYN-MFA Enabled"
 $GM = Get-MsolGroupMember -GroupObjectId  $G.ObjectId -all
-foreach ( $TargetUser in $GM)
+foreach ( $member in $GM)
 {
+    $TargetUser = Get-MsolUser -UserPrincipalName $member.EmailAddress
     if ($TargetUser.StrongAuthenticationMethods -ne $null) 
     {
         $Status = $true
