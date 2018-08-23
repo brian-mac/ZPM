@@ -68,12 +68,11 @@ Function CloseGracefully($Stream,$FileSystem)
 }
 
 # Main
- $inputfile = "C:\temp\DepartmentsFoodandBev1.csv"
+ #$inputfile = "C:\temp\DepartmentsFoodandBev1.csv"
 if ($Inputfile.Length -eq 0) 
 {
     $InputFile = read-host -prompt  "Please enter Filname and path e.g. C:\temp\DepartmentsFoodandBev1.csv"
 }
-# $inputfile = "C:\temp\DepartmentsFoodandBev1.csv"
 $logPath = "C:\temp\DetailsFromDept.log" 
 $path = test-path C:\Temp
 if ($path -eq $false)
