@@ -2,7 +2,7 @@
 .synopsis 
  This script will: 
 *Find all users who match the attributes in the Inputfile.
-*It will then list htese users in the output file.
+*It will then list these users in the output file.
 *At this stage the attribute is Department, but this script can easyly be modified to accept the attribute as a input parameter
 
 .Description
@@ -16,14 +16,14 @@ Optional the file name and location that stores the attribute to match.
 
 .Outputs
 System.io.FileStream Appendes to the log file C:\temp\UserDetails.log.
-System.io.FileStream Creates a new file       C:\temp\xxxResults.csv.
+System.io.FileStream Creates a new file       C:\temp\InputFileNameResults.csv.
 
 .Example
 To call this script with an input file  : powershell .\TSEG_UserDetailsFromDept.ps1 -inputfile 'C:\temp\exampledept.csv'
 #>
 [CmdletBinding (DefaultParameterSetName="Set 2")]
 param (
-    [Parameter(Mandatory=$True,HelpMessage="File path and name",Parametersetname = "Set 2" )][string] $Inputfile
+    [Parameter(Mandatory=$false,HelpMessage="File path and name",Parametersetname = "Set 2" )][string] $Inputfile
 )
 Function CreateFile ($ReqPath, $ReqMode)
 {
@@ -68,9 +68,29 @@ Function CloseGracefully($Stream,$FileSystem)
 }
 
 # Main
-$Inputfile = "C:\temp\DepartmentsFoodandBev1.csv"
-$Departments = import-csv -Path $Inputfile
-#  $Outpath = $inputfile.split("\")
+ $inputfile = "C:\temp\DepartmentsFoodandBev1.csv"
+if ($Inputfile.Length -eq 0) 
+{
+    $InputFile = read-host -prompt  "Please enter Filname and path e.g. C:\temp\DepartmentsFoodandBev1.csv"
+}
+# $inputfile = "C:\temp\DepartmentsFoodandBev1.csv"
+$logPath = "C:\temp\DetailsFromDept.log" 
+$path = test-path C:\Temp
+if ($path -eq $false)
+{
+    New-Item C:\temp -ItemType Directory 
+}
+$LogFile = CreateFile $LogPath "Create"
+$LogStream = New-Object System.io.StreamWriter($LogFile)
+try
+{
+    $Departments = import-csv -Path $Inputfile
+}
+catch 
+{
+    WriteData "Error with input file, please check path" $LogStream  
+    exit     
+}
 $Outpath = $Inputfile.split(".").item(0)
 $OutPath = $Outpath + "Result.csv" 
 $OutputFile = CreateFile  $OutPath "Create"
@@ -78,17 +98,23 @@ $OutPutStream = New-Object System.IO.StreamWriter($OutputFile)
 $targetAtt = "Department"
 $DataLine = "EmployeeNumber,EmailAddress,Department,Enabled"
 WriteData $DataLine $OutPutStream
-
 foreach ($Department in $Departments)
 {
-    $TargetDept = ($Department."$targetAtt").trim()
-    $TargetUsers = get-aduser -Filter '($targetAtt -eq $TargetDept) -and (EmailAddress -ne "*") -and (Enabled -eq $true)  ' -Properties  EmployeeNumber, department, EmailAddress, enabled
-    foreach($TargetUser in $TargetUSers)
+    Try
     {
-        #Get-ADUser $targetuser -Properties emailaddress, department
-        $DataLine =  $TargetUser.EmployeeNumber + "," + $TargetUser.emailaddress + "," + $TargetUser.Department + "," + $TargetUser.Enabled
-        WriteData $DataLine $OutPutStream
+        $TargetDept = ($Department."$targetAtt").trim()
+        $TargetUsers = get-aduser -Filter '($targetAtt -eq $TargetDept) -and (EmailAddress -ne "*") -and (Enabled -eq $true)  ' -Properties  EmployeeNumber, department, EmailAddress, enabled
+        foreach($TargetUser in $TargetUSers)
+        {
+            #Get-ADUser $targetuser -Properties emailaddress, department
+            $DataLine =  $TargetUser.EmployeeNumber + "," + $TargetUser.emailaddress + "," + $TargetUser.Department + "," + $TargetUser.Enabled
+            WriteData $DataLine $OutPutStream
+        }
+    }
+    Catch 
+    {
+        WriteLine "No Users could be fond for that department, please check department name" $LogFile
     }
 }
-
 CloseGracefully $OutputStream $OutputFile
+CloseGracefully $LogStream $LogFile

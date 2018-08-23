@@ -1,6 +1,6 @@
-$FTPServer = "192.168.0.160"
-$FTPPort = "32400"
-$tcpConnection = New-Object System.Net.Sockets.TcpClient($FTPServer, $FTPPort)
+$InterfaceServer = "SYDWOIFU01"
+$InterfacePort = "5002"
+$tcpConnection = New-Object System.Net.Sockets.TcpClient($InterfaceServer,$InterfacePort)
 $tcpStream = $tcpConnection.GetStream()
 $reader = New-Object System.IO.StreamReader($tcpStream)
 $writer = New-Object System.IO.StreamWriter($tcpStream)
