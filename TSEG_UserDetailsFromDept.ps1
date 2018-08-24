@@ -68,7 +68,7 @@ Function CloseGracefully($Stream,$FileSystem)
 }
 
 # Main
- #$inputfile = "C:\temp\DepartmentsFoodandBev1.csv"
+ $inputfile = "C:\temp\jimms.csv"
 if ($Inputfile.Length -eq 0) 
 {
     $InputFile = read-host -prompt  "Please enter Filname and path e.g. C:\temp\DepartmentsFoodandBev1.csv"
@@ -88,6 +88,7 @@ try
 catch 
 {
     WriteData "Error with input file, please check path" $LogStream  
+    CloseGracefully $LogStream $LogFile
     exit     
 }
 $Outpath = $Inputfile.split(".").item(0)
@@ -99,9 +100,19 @@ $DataLine = "EmployeeNumber,EmailAddress,Department,Enabled"
 WriteData $DataLine $OutPutStream
 foreach ($Department in $Departments)
 {
-    Try
+    try
     {
         $TargetDept = ($Department."$targetAtt").trim()
+    }
+    Catch 
+    {
+        WriteData "CSV file does not contain department on the first line" $LogStream
+        CloseGracefully $OutputStream $OutputFile
+        CloseGracefully $LogStream $LogFile
+        Exit 
+    }
+    Try
+    {
         $TargetUsers = get-aduser -Filter '($targetAtt -eq $TargetDept) -and (EmailAddress -ne "*") -and (Enabled -eq $true)  ' -Properties  EmployeeNumber, department, EmailAddress, enabled
         foreach($TargetUser in $TargetUSers)
         {
@@ -112,7 +123,7 @@ foreach ($Department in $Departments)
     }
     Catch 
     {
-        WriteLine "No Users could be fond for that department, please check department name" $LogFile
+        WriteData "No Users could be fond for that department, please check department name" $LogFile
     }
 }
 CloseGracefully $OutputStream $OutputFile
