@@ -15,12 +15,12 @@ $encoding = new-object System.Text.AsciiEncoding
 [byte]$STX = 0x02
 [byte]$ETX = 0x03
 
-if ($tcpConnection.Connected)
+if ($tcpConnection.Connected) #Else log or write could not connect
 {
     $command = $STX + '<LinkDescription Date="070818" Time="190649" VerNum="1.0" />' + $ETX
     $writer.WriteLine($command) | Out-Null
     $writer.Flush()
-    start-sleep -Milliseconds 900
+    start-sleep -Milliseconds 900 # can we lop until stream is avail with a 5 second timeout
     while ($tcpStream.DataAvailable)
     {
         $rawresponse = $reader.Read($buffer, 0, 1024)
