@@ -43,13 +43,13 @@ Function CloseGracefully($Stream,$FileSystem)
 $OutPath = "C:\temp\MFA-Disabled-Users.csv" 
 $OutputFile = CreateFile  $OutPath "Create"
 $OutPutStream = New-Object System.IO.StreamWriter($OutputFile)
-$DataLine = "GivenName,Surname,UserPrincipalname,Location1,Location2,Email,Phone"
+$DataLine = "GivenName,Surname,UserPrincipalname,Location1,Location2,Email,Phone,Depertment"
 WriteData $DataLine $OutPutStream
 
 $MFADisabledMembers = get-adgroupmember -identity "gg-aa-mfa disabled"
 foreach ($User in $MFADisabledMembers )
 {
-    $TargetUser = Get-ADUser $user.samaccountname -properties EmailAddress, telephoneNumber, StreetAddress, physicalDeliveryOfficeName
+    $TargetUser = Get-ADUser $user.samaccountname -properties EmailAddress, telephoneNumber, StreetAddress, physicalDeliveryOfficeName, Department
     $UserProperties = $TargetUser.PropertyNames
     foreach ($Field in $UserProperties)
     {
@@ -65,7 +65,7 @@ foreach ($User in $MFADisabledMembers )
     $TargetUser.StreetAddress = $TargetUser.StreetAddress -replace ',',' ' 
     $TargetUser.StreetAddress = $TargetUser.StreetAddress -replace "\n",' '
     $TargetUser.StreetAddress = $TargetUser.StreetAddress -replace "\r",' '
-    $DataLine = "$($TargetUser.GivenName),$($TargetUser.Surname),$($TargetUser.UserPrincipalname),$($TargetUser.streetaddress),$($TargetUser.physicalDeliveryOfficeName),$($TargetUser.emailaddress),$($TargetUser.telephonenumber)"
+    $DataLine = "$($TargetUser.GivenName),$($TargetUser.Surname),$($TargetUser.UserPrincipalname),$($TargetUser.streetaddress),$($TargetUser.physicalDeliveryOfficeName),$($TargetUser.emailaddress),$($TargetUser.telephonenumber),$($TargetUser.department)"
     WriteData $DataLine $OutPutStream
 }
 $degugcounter = $null
