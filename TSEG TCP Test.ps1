@@ -1,5 +1,5 @@
 $InterfaceServer = "SYDWOIFU01"
-$InterfacePort = "5002"
+$InterfacePort = "5041"
 $tcpConnection = New-Object System.Net.Sockets.TcpClient($InterfaceServer,$InterfacePort)
 $tcpStream = $tcpConnection.GetStream()
 $reader = New-Object System.IO.StreamReader($tcpStream)
@@ -9,16 +9,29 @@ $writer.AutoFlush = $true
 $buffer = new-object System.Byte[] 1024
 $encoding = new-object System.Text.AsciiEncoding 
 # Record start <STX> Record end <ETX>
-# [char]$STX = [char]2
-# [char]$eTX = [char]3
+#[string]$STX="<STX>"
+#[string]$ETX="<ETX>"
+# OR
+[char]$STX = [char]2
+[char]$eTX = [char]3
 #OR
-[byte]$STX = 0x02
-[byte]$ETX = 0x03
+#[byte]$STX = 0x02
+#[byte]$ETX = 0x03
 
 if ($tcpConnection.Connected) #Else log or write could not connect
 {
-    $command = $STX + '<LinkDescription Date="070818" Time="190649" VerNum="1.0" />' + $ETX
-    $writer.WriteLine($command) | Out-Null
+$Testcom = '<LinkStart Date="070818" Time="190649" />'  
+$command = $STX + '<LinkDescription Date="280818" Time="121655" VerNum="1.0" />' + $ETX
+$comArray = $command.ToCharArray()
+foreach ($Element in $comArray)
+    {
+        $tempCom = $tempcom + " " + [system.string]::format("{0:X}",[system.convert]::Touint32($element))
+    }
+    #$CByte = [system.Text.Encoding]::UTF8
+    #$CommandByte = $CByte.getbytes($command)
+    #$CommandByte = $CByte.getbytes($TempCom)
+   # $writer.WriteLine($commandByte) | Out-Null
+    $writer.WriteLine($Tempcom) | Out-Null
     $writer.Flush()
     start-sleep -Milliseconds 900 # can we lop until stream is avail with a 5 second timeout
     while ($tcpStream.DataAvailable)
