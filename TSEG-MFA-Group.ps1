@@ -57,7 +57,7 @@ ConnectMSOL
 $OutPath = "C:\temp\UserAuthMethod.csv" 
 $OutputFile = CreateFile  $OutPath "Create"
 $OutPutStream = New-Object System.IO.StreamWriter($OutputFile)
-$DataLine = "UPN,StrongAuth,Status"
+$DataLine = "UPN,StrongAuth,Status,MFAGroup,Department"
 WriteData $DataLine $OutPutStream
 #$MFAGroups = @("DYN-MFA Enabled","DYN-MFA Enabled2", "DYN-MFA Enabled3", "DYN-MFA Enabled4")
 $MFAGroups = Get-MsolGroup -SearchString "DYN-MFA Enabled"
@@ -75,7 +75,7 @@ foreach ($MFAGroup in $MFAGroups)
         {
             $Status = $false    
         }
-        $DataLine = $TargetUser.UserPrincipalName + "," + $TargetUser.StrongAuthenticationMethods + "," + $Status
+        $DataLine = $TargetUser.UserPrincipalName + "," + $TargetUser.StrongAuthenticationMethods + "," + $Status + "," + $MFAGroup.DisplayName + "," + $TargetUser.Department
         WriteData $DataLine $OutPutStream
     }
 }
