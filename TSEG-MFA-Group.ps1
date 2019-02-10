@@ -67,7 +67,7 @@ foreach ($MFAGroup in $MFAGroups)
     foreach ( $member in $GM)
     {
         $TargetUser = Get-MsolUser -UserPrincipalName $member.EmailAddress
-        if ($TargetUser.StrongAuthenticationMethods -ne $null) 
+        if ( $null -ne  $TargetUser.StrongAuthenticationMethods ) 
         {
             $Status = $true
         }   
