@@ -52,6 +52,28 @@ Function ConnectMSOL
         Connect-MsolService # -Credential $cred
     }
 }
+
+Function GetGroupDetails($targetGroups)
+{
+    foreach ($MFAGroup in $targetGroups)
+    {
+        $GM = Get-MsolGroupMember -GroupObjectId  $MFAGroup.ObjectId -all
+        foreach ( $member in $GM)
+        {
+            $TargetUser = Get-MsolUser -UserPrincipalName $member.EmailAddress
+            if ( $null -ne  $TargetUser.StrongAuthenticationMethods ) 
+            {
+                $Status = $true
+            }   
+            else
+            {
+                $Status = $false    
+            }
+            $DataLine = $TargetUser.UserPrincipalName + "," + $TargetUser.StrongAuthenticationMethods + "," + $Status + "," + $MFAGroup.DisplayName + "," + $TargetUser.Department
+            WriteData $DataLine $OutPutStream
+        }
+    }
+}
 # Main
 ConnectMSOL
 $OutPath = "C:\temp\UserAuthMethod.csv" 
@@ -61,22 +83,8 @@ $DataLine = "UPN,StrongAuth,Status,MFAGroup,Department"
 WriteData $DataLine $OutPutStream
 #$MFAGroups = @("DYN-MFA Enabled","DYN-MFA Enabled2", "DYN-MFA Enabled3", "DYN-MFA Enabled4")
 $MFAGroups = Get-MsolGroup -SearchString "DYN-MFA Enabled"
-foreach ($MFAGroup in $MFAGroups)
-{
-    $GM = Get-MsolGroupMember -GroupObjectId  $MFAGroup.ObjectId -all
-    foreach ( $member in $GM)
-    {
-        $TargetUser = Get-MsolUser -UserPrincipalName $member.EmailAddress
-        if ( $null -ne  $TargetUser.StrongAuthenticationMethods ) 
-        {
-            $Status = $true
-        }   
-        else
-        {
-            $Status = $false    
-        }
-        $DataLine = $TargetUser.UserPrincipalName + "," + $TargetUser.StrongAuthenticationMethods + "," + $Status + "," + $MFAGroup.DisplayName + "," + $TargetUser.Department
-        WriteData $DataLine $OutPutStream
-    }
-}
+GetGroupDetails $MFAGroups
+$MFAGroups = Get-MsolGroup -SearchString "DYN-SSPR Rostered Staff"
+GetGroupDetails $MFAGroups
+
 CloseGracefully $OutputStream $OutputFile
