@@ -48,7 +48,7 @@ Function ConnectMSOL
     catch 
     {
         #if ($cred -eq $null) {$cred = Get-Credential -Message "Pleas eenter Azure Credentials" $O365Adminuser}
-        Write-Output "Connecting to Office Azure..."
+        Write-Host "Connecting to Office Azure..."
         Connect-MsolService # -Credential $cred
     }
 }
