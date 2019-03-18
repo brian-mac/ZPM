@@ -58,10 +58,11 @@ Function GetGroupDetails($targetGroups)
     foreach ($MFAGroup in $targetGroups)
     {
         $GM = Get-MsolGroupMember -GroupObjectId  $MFAGroup.ObjectId -all
-        foreach ( $member in $GM)
+        foreach ($member in $GM)
         {
             $TargetUser = Get-MsolUser -UserPrincipalName $member.EmailAddress
-            if ( $null -ne  $TargetUser.StrongAuthenticationMethods ) 
+            $AuthMethod = $TargetUser.StrongAuthenticationMethods 
+            if ($AuthMethod.count) 
             {
                 $Status = $true
             }   
