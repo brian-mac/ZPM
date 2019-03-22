@@ -105,10 +105,10 @@ Foreach ($Ousr in $OUsers)
 
 {  
 
-$chkEmpID = ($Ousr.EMPLOYEE_NUMBER).trim() # added trim function incase there are trailing spaces
-$chkLocation = ($Ousr.SITE).trim()
-$chkEBA = ($Ousr.EA).trim()
-$chkChatGroup = ($Ousr."CHAT_GROUP ").trim() #The input file has a trailing space in the field name.
+$chkEmpID = $Ousr.EMPLOYEE_NUMBER
+$chkLocation = $Ousr.SITE
+$chkEBA = $Ousr.EA
+$chkChatGroup = $Ousr.CHAT_GROUP
 
                         $ADUsr = Get-ADUser -Filter {employeeNumber -eq $chkEmpID} -Properties extensionAttribute6
                         # Iterate the users and format the Chatter configuration string
