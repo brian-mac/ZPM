@@ -2,7 +2,23 @@
 
 $caperr=$null
 $importfile="C:\temp\Chatter_users.csv" #change this back to $importfile="D:\Download\chatter_users.csv
+function ValidFileDate ($TargetFile,$DaysOld,$Sender,$Recipient)
+{
+    # Checks to see if the target file is older than a certian number of days, if so it will send a mail notifying a target recipient.
+    $FileDate = (get-itemproperty -path ($TargetFile)).CreationTime
+    $TodaysDate = get-date 
+    
+    if ($FileDate -lt $TodaysDate.AddDays(-$daysOld))
+    {
+        SendMail $Sender $Recipient "File is older than $($daysOld) days" "File was last updated on $($FileDate)"
+    }
 
+}
+Function SendMail ($Sender, $target, $subject, $Body)
+{
+    $UnpackTarget =  (($Target.split("@").item(0)).replace("."," ")) + " <$Target>"
+    send-mailmessage -from $Sender -to $UnpackTarget -subject $subject -Body $Body
+}
 
 Function stringConstruct  
 {
@@ -78,7 +94,8 @@ $chattermoderatorgroup = "GG-U-Chatter-Moderators"
 $ChatModerators = Get-ADGroupMember -identity $chattermoderatorgroup -Recursive | Select -ExpandProperty distinguishedName
 
 
-
+#Check the age of the source file.  If it is older than xx days send a mail to xxx@star.com.au
+ValidFileDate "D:\Download\chatter_users.csv" 7 "Chatter Server <SYDW@star.com.au>" "Craig.alchin@star.com.au"
 
 #Update the below to point to the Oracle user extract.
 $OUsers = Import-Csv $importfile

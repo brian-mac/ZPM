@@ -1,6 +1,6 @@
 function ValidFileDate ($TargetFile,$DaysOld,$Sender,$Recipient)
 {
-    #Checks to see if the traget file is older than a certian number of days, if so it will send a mail notifying a target recipient.
+    # Checks to see if the target file is older than a certian number of days, if so it will send a mail notifying a target recipient.
     $FileDate = (get-itemproperty -path ($TargetFile)).CreationTime
     $TodaysDate = get-date 
     
