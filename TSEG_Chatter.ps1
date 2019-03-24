@@ -1,17 +1,22 @@
-#variables
 
-$caperr=$null
-$importfile="C:\temp\Chatter_users.csv" #change this back to $importfile="D:\Download\chatter_users.csv
 function ValidFileDate ($TargetFile,$DaysOld,$Sender,$Recipient)
 {
     # Checks to see if the target file is older than a certian number of days, if so it will send a mail notifying a target recipient.
-    $FileDate = (get-itemproperty -path ($TargetFile)).CreationTime
     $TodaysDate = get-date 
-    
-    if ($FileDate -lt $TodaysDate.AddDays(-$daysOld))
+    try 
     {
-        SendMail $Sender $Recipient "File is older than $($daysOld) days" "File was last updated on $($FileDate)"
+        $FileDate = (get-itemproperty -path ($TargetFile) -ErrorAction Stop).CreationTime 
+       if ($FileDate -lt $TodaysDate.AddDays(-$daysOld))
+        {
+            SendMail $Sender $Recipient "File is older than $($daysOld) days" "File was last updated on $($FileDate)"
+        }
     }
+    Catch
+    {
+        SendMail $Sender $Recipient "File does not exist" "File did not exist on $($TodaysDate)" 
+        exit
+    }
+     
 
 }
 Function SendMail ($Sender, $target, $subject, $Body)
@@ -88,21 +93,29 @@ $strReturn += $strChatGroup
 return $strReturn
 }
 
+#variables
+
+$caperr = $null
+#Update the below to point to the Oracle user extract.
+$ImportFile = "D:\Download\chatter_users.csv" #"C:\temp\Chatter_users.csv" 
 $chattermoderatorgroup = "GG-U-Chatter-Moderators"
+$PSEmailServer = "smtp.casino.internal"
 
 # Get Moderator Group Mambers
 $ChatModerators = Get-ADGroupMember -identity $chattermoderatorgroup -Recursive | Select -ExpandProperty distinguishedName
 
 
 #Check the age of the source file.  If it is older than xx days send a mail to xxx@star.com.au
-ValidFileDate "D:\Download\chatter_users.csv" 7 "Chatter Server <SYDW@star.com.au>" "Craig.alchin@star.com.au"
+ValidFileDate $ImportFile 7 "Chatter Server <SYDW@star.com.au>" "Craig.alchin@star.com.au" #"brian.mcelhinney@star.com.au" #change bck to 
 
-#Update the below to point to the Oracle user extract.
-$OUsers = Import-Csv $importfile
+
+# Check the headers for spaces and import data from file (this bit liberated from JasonPearce.com on the Intertubes.)
+$SourceHeadersDirty = get-content -path $ImportFile -first 2 |ConvertFrom-Csv
+$SourceHeadersClean = $SourceHeadersDirty.psobject.properties.name.trim(" ") -replace '\s',''
+$OUsers = Import-Csv $importfile -header $SourceHeadersClean |select-object -skip 1
 
 $n=0
 Foreach ($Ousr in $OUsers)
-
 {  
 
 $chkEmpID = $Ousr.EMPLOYEE_NUMBER
