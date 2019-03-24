@@ -15,9 +15,7 @@ function ValidFileDate ($TargetFile,$DaysOld,$Sender,$Recipient)
     {
         SendMail $Sender $Recipient "File does not exist" "File did not exist on $($TodaysDate)" 
         exit
-    }
-     
-
+    }   
 }
 Function SendMail ($Sender, $target, $subject, $Body)
 {
@@ -97,7 +95,7 @@ return $strReturn
 
 $caperr = $null
 #Update the below to point to the Oracle user extract.
-$ImportFile = "D:\Download\chatter_users.csv" #"C:\temp\Chatter_users.csv" 
+$ImportFile = "C:\temp\Chatter_users.csv" #"D:\Download\chatter_users.csv" # 
 $chattermoderatorgroup = "GG-U-Chatter-Moderators"
 $PSEmailServer = "smtp.casino.internal"
 
@@ -106,7 +104,7 @@ $ChatModerators = Get-ADGroupMember -identity $chattermoderatorgroup -Recursive 
 
 
 #Check the age of the source file.  If it is older than xx days send a mail to xxx@star.com.au
-ValidFileDate $ImportFile 7 "Chatter Server <SYDW@star.com.au>" "Craig.alchin@star.com.au" #"brian.mcelhinney@star.com.au" #change bck to 
+ValidFileDate $ImportFile 7 "Chatter Server <SYDW@star.com.au>" "brian.mcelhinney@star.com.au" #change bck to "Craig.alchin@star.com.au" #
 
 
 # Check the headers for spaces and import data from file (this bit liberated from JasonPearce.com on the Intertubes.)
