@@ -83,9 +83,11 @@ $OutPutStream = New-Object System.IO.StreamWriter($OutputFile)
 $DataLine = "UPN,StrongAuth,Status,MFAGroup,Department"
 WriteData $DataLine $OutPutStream
 #$MFAGroups = @("DYN-MFA Enabled","DYN-MFA Enabled2", "DYN-MFA Enabled3", "DYN-MFA Enabled4")
-$MFAGroups = Get-MsolGroup -SearchString "DYN-MFA Enabled"
+$MFAGroups = Get-MsolGroup -SearchString "DYN-SSPR Office Staff"
 GetGroupDetails $MFAGroups
 $MFAGroups = Get-MsolGroup -SearchString "DYN-SSPR Rostered Staff"
+GetGroupDetails $MFAGroups
+$MFAGroups = Get-MsolGroup -SearchString "DYN-SSPR-MFA-Rostered Staffs"
 GetGroupDetails $MFAGroups
 
 CloseGracefully $OutputStream $OutputFile
