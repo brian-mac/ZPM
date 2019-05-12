@@ -89,7 +89,7 @@ $MFAGroups = Get-MsolGroup -SearchString "DYN-SSPR Rostered Staff"
 GetGroupDetails $MFAGroups
 $MFAGroups = Get-MsolGroup -SearchString "DYN-SSPR-MFA-Rostered Staffs"
 GetGroupDetails $MFAGroups
-$MFAGroups = Get-MsolGroup -SearchString "DYN-SSPR-MFA-Non-Rostered Staffs"
+$MFAGroups = Get-MsolGroup -SearchString "DYN-SSPR-MFA-Non-Rostered Staff"
 GetGroupDetails $MFAGroups
 
 CloseGracefully $OutputStream $OutputFile

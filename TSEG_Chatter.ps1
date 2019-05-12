@@ -116,47 +116,38 @@ $n=0
 Foreach ($Ousr in $OUsers)
 {  
 
-$chkEmpID = $Ousr.EMPLOYEE_NUMBER
-$chkLocation = $Ousr.SITE
-$chkEBA = $Ousr.EA
-$chkChatGroup = $Ousr.CHAT_GROUP
-
-                        $ADUsr = Get-ADUser -Filter {employeeNumber -eq $chkEmpID} -Properties extensionAttribute6
-                        # Iterate the users and format the Chatter configuration string
-                        foreach($ADUser in $ADUsr)
-                        {
-
-
-                        If ($ChatModerators -contains $ADUser.distinguishedName) {
-                         $chatterRole = "Moderator"
-                         } Else {
-                         $chatterRole = "Free"
-                        }
-
-                        $AextAttrib = stringConstruct -chatterRole $chatterRole -location $chkLocation -EBA $chkEBA -ChatGroup $chkChatGroup
-                        
-                        try 
-                        {
-                          
-                        write-host $n "$($ADUser.Name)*$($AextAttrib)"
-                        $n = $n + 1
-                            # Update properties.
-                            $ADUsr.extensionAttribute6 = $AextAttrib
-
- 
-                            # Update the user data in AD
-                            Set-ADUser -Instance $ADUser 
-                        }
-                        catch
-                        {
-                        $dt=get-date
-                        $caperr += "$($dt) | $($ADUser.Name) | $($ADUser.DistinguishedName) | $($_.Exception.Message)`n"
-                        
-                        }
-                        }
-
-
-  
+    $chkEmpID = $Ousr.EMPLOYEE_NUMBER
+    $chkLocation = $Ousr.SITE
+    $chkEBA = $Ousr.EA
+    $chkChatGroup = $Ousr.CHAT_GROUP
+    $ADUsr = Get-ADUser -Filter {employeeNumber -eq $chkEmpID} -Properties extensionAttribute6
+    # Iterate the users and format the Chatter configuration string
+    foreach($ADUser in $ADUsr)
+    {
+        If ($ChatModerators -contains $ADUser.distinguishedName)
+        {
+            $chatterRole = "Moderator"
+        } 
+        Else
+        {
+            $chatterRole = "Free"
+        }
+        $AextAttrib = stringConstruct -chatterRole $chatterRole -location $chkLocation -EBA $chkEBA -ChatGroup $chkChatGroup               
+        try 
+        {
+            write-host $n "$($ADUser.Name)*$($AextAttrib)"
+            $n = $n + 1
+            # Update properties.
+            $ADUsr.extensionAttribute6 = $AextAttrib
+            # Update the user data in AD
+            Set-ADUser -Instance $ADUser 
+        }
+        catch
+        {
+            $dt=get-date
+            $caperr += "$($dt) | $($ADUser.Name) | $($ADUser.DistinguishedName) | $($_.Exception.Message)`n"
+        }
+        }
 }                            
 
 #export error log
