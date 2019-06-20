@@ -48,8 +48,31 @@ Function ConnectMSOL
     catch 
     {
         #if ($cred -eq $null) {$cred = Get-Credential -Message "Pleas eenter Azure Credentials" $O365Adminuser}
-        Write-Output "Connecting to Office Azure..."
+        Write-Host "Connecting to Office Azure..."
         Connect-MsolService # -Credential $cred
+    }
+}
+
+Function GetGroupDetails($targetGroups)
+{
+    foreach ($MFAGroup in $targetGroups)
+    {
+        $GM = Get-MsolGroupMember -GroupObjectId  $MFAGroup.ObjectId -all
+        foreach ($member in $GM)
+        {
+            $TargetUser = Get-MsolUser -UserPrincipalName $member.EmailAddress
+            $AuthMethod = $TargetUser.StrongAuthenticationMethods 
+            if ($AuthMethod.count) 
+            {
+                $Status = $true
+            }   
+            else
+            {
+                $Status = $false    
+            }
+            $DataLine = $TargetUser.UserPrincipalName + "," + $TargetUser.StrongAuthenticationMethods + "," + $Status + "," + $MFAGroup.DisplayName + "," + $TargetUser.Department
+            WriteData $DataLine $OutPutStream
+        }
     }
 }
 # Main
@@ -57,26 +80,16 @@ ConnectMSOL
 $OutPath = "C:\temp\UserAuthMethod.csv" 
 $OutputFile = CreateFile  $OutPath "Create"
 $OutPutStream = New-Object System.IO.StreamWriter($OutputFile)
-$DataLine = "UPN,StrongAuth,Status"
+$DataLine = "UPN,StrongAuth,Status,MFAGroup,Department"
 WriteData $DataLine $OutPutStream
 #$MFAGroups = @("DYN-MFA Enabled","DYN-MFA Enabled2", "DYN-MFA Enabled3", "DYN-MFA Enabled4")
-$MFAGroups = Get-MsolGroup -SearchString "DYN-MFA Enabled"
-foreach ($MFAGroup in $MFAGroups)
-{
-    $GM = Get-MsolGroupMember -GroupObjectId  $MFAGroup.ObjectId -all
-    foreach ( $member in $GM)
-    {
-        $TargetUser = Get-MsolUser -UserPrincipalName $member.EmailAddress
-        if ($TargetUser.StrongAuthenticationMethods -ne $null) 
-        {
-            $Status = $true
-        }   
-        else
-        {
-            $Status = $false    
-        }
-        $DataLine = $TargetUser.UserPrincipalName + "," + $TargetUser.StrongAuthenticationMethods + "," + $Status
-        WriteData $DataLine $OutPutStream
-    }
-}
+$MFAGroups = Get-MsolGroup -SearchString "DYN-SSPR Office Staff"
+GetGroupDetails $MFAGroups
+$MFAGroups = Get-MsolGroup -SearchString "DYN-SSPR Rostered Staff"
+GetGroupDetails $MFAGroups
+$MFAGroups = Get-MsolGroup -SearchString "DYN-SSPR-MFA-Rostered Staffs"
+GetGroupDetails $MFAGroups
+$MFAGroups = Get-MsolGroup -SearchString "DYN-SSPR-MFA-Non-Rostered Staff"
+GetGroupDetails $MFAGroups
+
 CloseGracefully $OutputStream $OutputFile
